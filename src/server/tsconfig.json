@@ -5,7 +5,6 @@
     "lib": ["ES2023"],
     "moduleResolution": "bundler",
     "types": ["node"],
-    "rootDir": ".",
     "outDir": "../../dist/types/server",
     "strict": true,
     "esModuleInterop": true,

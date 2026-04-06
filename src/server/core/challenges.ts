@@ -100,16 +100,16 @@ export class ChallengeService {
     const cacheKey = `challenge:daily:${today}`;
 
     // Check if challenge exists in cache
-    const cached = await redis.get(cacheKey);
+    const cached = await redis.get<any>(cacheKey);
     if (cached) {
-      return JSON.parse(cached);
+      return (typeof cached === "string" ? JSON.parse(cached) : cached);
     }
 
     // Generate new challenge
     const challenge = this.generateChallenge(today);
 
     // Cache for 24 hours
-    await redis.set(cacheKey, JSON.stringify(challenge), { expiration: new Date(Date.now() + 86400000) });
+    await redis.set(cacheKey, JSON.stringify(challenge), { ex: 86400 });
 
     return challenge;
   }
@@ -171,17 +171,17 @@ export class ChallengeService {
     const leaderboardKey = `challenge:leaderboard:${date}`;
 
     // Add to daily challenge leaderboard
-    await redis.zAdd(leaderboardKey, { member: username, score });
+    await redis.zadd(leaderboardKey, { member: username, score });
 
     // Set expiration for 30 days
     await redis.expire(leaderboardKey, 86400 * 30);
 
     // Get player's rank
-    const rank = await redis.zRank(leaderboardKey, username);
+    const rank = await redis.zrank(leaderboardKey, username);
 
     // Store player's challenge stats
     const statsKey = `challenge:stats:${username}:${date}`;
-    await redis.hSet(statsKey, {
+    await redis.hset(statsKey, {
       score: score.toString(),
       wave: wave.toString(),
       kills: kills.toString(),
@@ -197,10 +197,7 @@ export class ChallengeService {
    */
   static async getChallengeLeaderboard(date: string, limit: number = 10) {
     const leaderboardKey = `challenge:leaderboard:${date}`;
-    const results = await redis.zRange(leaderboardKey, 0, limit - 1, {
-      by: 'rank',
-      reverse: true,
-    });
+    const results = (await redis.zrange(leaderboardKey, 0, limit - 1, { rev: true }) as any[]);
 
     return results.map((item, index) => ({
       rank: index + 1,
@@ -214,7 +211,7 @@ export class ChallengeService {
    */
   static async getPlayerChallengeStats(username: string, date: string) {
     const statsKey = `challenge:stats:${username}:${date}`;
-    const stats = await redis.hGetAll(statsKey);
+    const stats = (await redis.hgetall(statsKey) as any);
 
     if (!stats || Object.keys(stats).length === 0) {
       return null;

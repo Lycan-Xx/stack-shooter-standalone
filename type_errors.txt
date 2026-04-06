@@ -1,0 +1,62 @@
+
+> stack-shooter@0.0.0 type-check
+> tsc --build
+
+src/server/core/challenges.ts(105,25): error TS2345: Argument of type '{}' is not assignable to parameter of type 'string'.
+src/server/core/challenges.ts(112,60): error TS2353: Object literal may only specify known properties, and 'expiration' does not exist in type 'SetCommandOptions'.
+src/server/core/challenges.ts(174,17): error TS2551: Property 'zAdd' does not exist on type 'Redis'. Did you mean 'zadd'?
+src/server/core/challenges.ts(180,30): error TS2551: Property 'zRank' does not exist on type 'Redis'. Did you mean 'zrank'?
+src/server/core/challenges.ts(184,17): error TS2551: Property 'hSet' does not exist on type 'Redis'. Did you mean 'hset'?
+src/server/core/challenges.ts(200,33): error TS2551: Property 'zRange' does not exist on type 'Redis'. Did you mean 'zrange'?
+src/server/core/challenges.ts(205,25): error TS7006: Parameter 'item' implicitly has an 'any' type.
+src/server/core/challenges.ts(205,31): error TS7006: Parameter 'index' implicitly has an 'any' type.
+src/server/core/challenges.ts(217,31): error TS2551: Property 'hGetAll' does not exist on type 'Redis'. Did you mean 'hgetall'?
+src/server/core/leaderboard.ts(19,17): error TS2551: Property 'zAdd' does not exist on type 'Redis'. Did you mean 'zadd'?
+src/server/core/leaderboard.ts(22,17): error TS2551: Property 'zAdd' does not exist on type 'Redis'. Did you mean 'zadd'?
+src/server/core/leaderboard.ts(26,17): error TS2551: Property 'zAdd' does not exist on type 'Redis'. Did you mean 'zadd'?
+src/server/core/leaderboard.ts(31,17): error TS2551: Property 'zAdd' does not exist on type 'Redis'. Did you mean 'zadd'?
+src/server/core/leaderboard.ts(52,38): error TS2551: Property 'hGetAll' does not exist on type 'Redis'. Did you mean 'hgetall'?
+src/server/core/leaderboard.ts(71,17): error TS2551: Property 'hSet' does not exist on type 'Redis'. Did you mean 'hset'?
+src/server/core/leaderboard.ts(93,17): error TS2551: Property 'hIncrBy' does not exist on type 'Redis'. Did you mean 'hincrby'?
+src/server/core/leaderboard.ts(94,17): error TS2551: Property 'hIncrBy' does not exist on type 'Redis'. Did you mean 'hincrby'?
+src/server/core/leaderboard.ts(97,17): error TS2551: Property 'hIncrBy' does not exist on type 'Redis'. Did you mean 'hincrby'?
+src/server/core/leaderboard.ts(98,17): error TS2551: Property 'hIncrBy' does not exist on type 'Redis'. Did you mean 'hincrby'?
+src/server/core/leaderboard.ts(102,17): error TS2551: Property 'hIncrBy' does not exist on type 'Redis'. Did you mean 'hincrby'?
+src/server/core/leaderboard.ts(109,33): error TS2551: Property 'zRange' does not exist on type 'Redis'. Did you mean 'zrange'?
+src/server/core/leaderboard.ts(114,25): error TS7006: Parameter 'item' implicitly has an 'any' type.
+src/server/core/leaderboard.ts(114,31): error TS7006: Parameter 'index' implicitly has an 'any' type.
+src/server/core/leaderboard.ts(128,33): error TS2551: Property 'zRange' does not exist on type 'Redis'. Did you mean 'zrange'?
+src/server/core/leaderboard.ts(133,25): error TS7006: Parameter 'item' implicitly has an 'any' type.
+src/server/core/leaderboard.ts(133,31): error TS7006: Parameter 'index' implicitly has an 'any' type.
+src/server/core/leaderboard.ts(145,33): error TS2551: Property 'zRange' does not exist on type 'Redis'. Did you mean 'zrange'?
+src/server/core/leaderboard.ts(147,25): error TS7006: Parameter 'item' implicitly has an 'any' type.
+src/server/core/leaderboard.ts(147,31): error TS7006: Parameter 'index' implicitly has an 'any' type.
+src/server/core/leaderboard.ts(159,33): error TS2551: Property 'zRange' does not exist on type 'Redis'. Did you mean 'zrange'?
+src/server/core/leaderboard.ts(161,25): error TS7006: Parameter 'item' implicitly has an 'any' type.
+src/server/core/leaderboard.ts(161,31): error TS7006: Parameter 'index' implicitly has an 'any' type.
+src/server/core/leaderboard.ts(173,30): error TS2551: Property 'hGetAll' does not exist on type 'Redis'. Did you mean 'hgetall'?
+src/server/core/leaderboard.ts(197,30): error TS2551: Property 'zRank' does not exist on type 'Redis'. Did you mean 'zrank'?
+src/server/core/leaderboard.ts(209,13): error TS2551: Property 'hGetAll' does not exist on type 'Redis'. Did you mean 'hgetall'?
+src/server/core/leaderboard.ts(210,13): error TS2551: Property 'hGetAll' does not exist on type 'Redis'. Did you mean 'hgetall'?
+src/server/core/post.ts(1,33): error TS2307: Cannot find module '@devvit/web/server' or its corresponding type declarations.
+src/server/core/squads.ts(95,19): error TS2551: Property 'zAdd' does not exist on type 'Redis'. Did you mean 'zadd'?
+src/server/core/squads.ts(111,23): error TS2345: Argument of type '{}' is not assignable to parameter of type 'string'.
+src/server/core/squads.ts(120,26): error TS2345: Argument of type '{}' is not assignable to parameter of type 'string'.
+src/server/core/squads.ts(129,26): error TS2345: Argument of type '{}' is not assignable to parameter of type 'string'.
+src/server/core/squads.ts(178,7): error TS2353: Object literal may only specify known properties, and 'expiration' does not exist in type 'SetCommandOptions'.
+src/server/core/squads.ts(236,39): error TS2345: Argument of type '{}' is not assignable to parameter of type 'string'.
+src/server/core/squads.ts(248,19): error TS2551: Property 'zRem' does not exist on type 'Redis'. Did you mean 'zrem'?
+src/server/core/squads.ts(274,39): error TS2345: Argument of type '{}' is not assignable to parameter of type 'string'.
+src/server/core/squads.ts(285,17): error TS2551: Property 'zAdd' does not exist on type 'Redis'. Did you mean 'zadd'?
+src/server/core/squads.ts(289,36): error TS2551: Property 'hGetAll' does not exist on type 'Redis'. Did you mean 'hgetall'?
+src/server/core/squads.ts(294,17): error TS2551: Property 'hSet' does not exist on type 'Redis'. Did you mean 'hset'?
+src/server/core/squads.ts(305,33): error TS2551: Property 'zRange' does not exist on type 'Redis'. Did you mean 'zrange'?
+src/server/core/squads.ts(311,26): error TS7006: Parameter 'item' implicitly has an 'any' type.
+src/server/core/squads.ts(318,27): error TS7006: Parameter 's' implicitly has an 'any' type.
+src/server/core/squads.ts(318,50): error TS7006: Parameter 'squad' implicitly has an 'any' type.
+src/server/core/squads.ts(318,57): error TS7006: Parameter 'index' implicitly has an 'any' type.
+src/server/core/squads.ts(329,30): error TS2551: Property 'hGetAll' does not exist on type 'Redis'. Did you mean 'hgetall'?
+src/server/index.ts(8,8): error TS6059: File 'C:/Users/lycan-xx12/workspace/react/stack-shooter-reddit/src/shared/types/api.ts' is not under 'rootDir' 'C:/Users/lycan-xx12/workspace/react/stack-shooter-reddit/src/server'. 'rootDir' is expected to contain all source files.
+  The file is in the program because:
+    Imported via '../shared/types/api.js' from file 'C:/Users/lycan-xx12/workspace/react/stack-shooter-reddit/src/server/index.ts'
+    Imported via '../../shared/types/api' from file 'C:/Users/lycan-xx12/workspace/react/stack-shooter-reddit/src/server/core/leaderboard.ts'

@@ -58,13 +58,13 @@ export class SquadService {
       }
 
       // Check if tag is already taken
-      const existingSquad = await redis.get(`squad:tag:${tag}`);
+      const existingSquad = await redis.get<any>(`squad:tag:${tag}`);
       if (existingSquad) {
         return { success: false, error: 'Squad tag already taken' };
       }
 
       // Check if user is already in a squad
-      const userSquad = await redis.get(`user:${creator}:squad`);
+      const userSquad = await redis.get<any>(`user:${creator}:squad`);
       if (userSquad) {
         return { success: false, error: 'You are already in a squad' };
       }
@@ -92,7 +92,7 @@ export class SquadService {
       await redis.set(`user:${creator}:squad`, squadId);
 
       // Add to squad leaderboard
-      await redis.zAdd('squads:leaderboard', { member: squadId, score: 0 });
+      await redis.zadd('squads:leaderboard', { member: squadId, score: 0 });
 
       console.log(`Squad created successfully: ${squadId}`);
       return { success: true, squad };
@@ -106,16 +106,16 @@ export class SquadService {
    * Get squad by ID
    */
   static async getSquad(squadId: string): Promise<Squad | null> {
-    const data = await redis.get(`squad:${squadId}`);
+    const data = await redis.get<any>(`squad:${squadId}`);
     if (!data) return null;
-    return JSON.parse(data);
+    return (typeof data === "string" ? JSON.parse(data) : data);
   }
 
   /**
    * Get squad by tag
    */
   static async getSquadByTag(tag: string): Promise<Squad | null> {
-    const squadId = await redis.get(`squad:tag:${tag}`);
+    const squadId = await redis.get<any>(`squad:tag:${tag}`);
     if (!squadId) return null;
     return this.getSquad(squadId);
   }
@@ -124,7 +124,7 @@ export class SquadService {
    * Get user's squad
    */
   static async getUserSquad(username: string): Promise<Squad | null> {
-    const squadId = await redis.get(`user:${username}:squad`);
+    const squadId = await redis.get<any>(`user:${username}:squad`);
     if (!squadId) return null;
     return this.getSquad(squadId);
   }
@@ -153,13 +153,13 @@ export class SquadService {
     }
 
     // Check if user is already in a squad
-    const userSquad = await redis.get(`user:${invitedUser}:squad`);
+    const userSquad = await redis.get<any>(`user:${invitedUser}:squad`);
     if (userSquad) {
       return { success: false, error: 'User is already in a squad' };
     }
 
     // Check if invite already exists
-    const existingInvite = await redis.get(`invite:${invitedUser}:${squadId}`);
+    const existingInvite = await redis.get<any>(`invite:${invitedUser}:${squadId}`);
     if (existingInvite) {
       return { success: false, error: 'Invite already sent' };
     }
@@ -203,7 +203,7 @@ export class SquadService {
     }
 
     // Check if user is already in a squad
-    const userSquad = await redis.get(`user:${username}:squad`);
+    const userSquad = await redis.get<any>(`user:${username}:squad`);
     if (userSquad) {
       return { success: false, error: 'You are already in a squad' };
     }
@@ -228,7 +228,7 @@ export class SquadService {
    * Leave squad
    */
   static async leaveSquad(username: string): Promise<{ success: boolean; error?: string }> {
-    const squadId = await redis.get(`user:${username}:squad`);
+    const squadId = await redis.get<any>(`user:${username}:squad`);
     if (!squadId) {
       return { success: false, error: 'You are not in a squad' };
     }
@@ -245,7 +245,7 @@ export class SquadService {
     if (squad.members.length === 0) {
       await redis.del(`squad:${squadId}`);
       await redis.del(`squad:tag:${squad.tag}`);
-      await redis.zRem('squads:leaderboard', [squadId]);
+      await redis.zrem('squads:leaderboard', [squadId]);
     } else {
       // If creator left, assign new creator
       if (squad.creator === username) {
@@ -268,7 +268,7 @@ export class SquadService {
     kills: number,
     won: boolean
   ): Promise<void> {
-    const squadId = await redis.get(`user:${username}:squad`);
+    const squadId = await redis.get<any>(`user:${username}:squad`);
     if (!squadId) return;
 
     const squad = await this.getSquad(squadId);
@@ -282,16 +282,16 @@ export class SquadService {
     await redis.set(`squad:${squadId}`, JSON.stringify(squad));
 
     // Update squad leaderboard
-    await redis.zAdd('squads:leaderboard', { member: squadId, score: squad.totalScore });
+    await redis.zadd('squads:leaderboard', { member: squadId, score: squad.totalScore });
 
     // Update member contribution
     const memberKey = `squad:${squadId}:member:${username}`;
-    const memberData = await redis.hGetAll(memberKey);
+    const memberData = (await redis.hgetall(memberKey) as any);
     const contribution = parseInt(memberData.contribution || '0') + score;
     const memberKills = parseInt(memberData.kills || '0') + kills;
     const memberWins = parseInt(memberData.wins || '0') + (won ? 1 : 0);
 
-    await redis.hSet(memberKey, {
+    await redis.hset(memberKey, {
       contribution: contribution.toString(),
       kills: memberKills.toString(),
       wins: memberWins.toString(),
@@ -302,10 +302,7 @@ export class SquadService {
    * Get squad leaderboard
    */
   static async getSquadLeaderboard(limit: number = 10) {
-    const results = await redis.zRange('squads:leaderboard', 0, limit - 1, {
-      by: 'rank',
-      reverse: true,
-    });
+    const results = (await redis.zrange('squads:leaderboard', 0, limit - 1, { rev: true }) as any[]);
 
     const squads = await Promise.all(
       results.map(async (item) => {
@@ -315,7 +312,7 @@ export class SquadService {
       })
     );
 
-    return squads.filter((s) => s !== null).map((squad, index) => ({
+    return squads.filter((s) => s != null).map((squad, index) => ({
       rank: index + 1,
       squad: squad!,
     }));
@@ -326,7 +323,7 @@ export class SquadService {
    */
   static async getSquadMemberStats(squadId: string, username: string) {
     const memberKey = `squad:${squadId}:member:${username}`;
-    const data = await redis.hGetAll(memberKey);
+    const data = (await redis.hgetall(memberKey) as any);
 
     if (!data || Object.keys(data).length === 0) {
       return {

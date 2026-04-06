@@ -16,19 +16,19 @@ export class LeaderboardService {
     won: boolean
   ): Promise<void> {
     // Update global all-time leaderboard
-    await redis.zAdd('leaderboard:global:alltime', { member: username, score });
+    await redis.zadd('leaderboard:global:alltime', { member: username, score });
 
     // Update subreddit leaderboard
-    await redis.zAdd(`leaderboard:subreddit:${subredditName}`, { member: username, score });
+    await redis.zadd(`leaderboard:subreddit:${subredditName}`, { member: username, score });
 
     // Update daily leaderboard
     const dailyKey = `leaderboard:daily:${this.getDayKey()}`;
-    await redis.zAdd(dailyKey, { member: username, score });
+    await redis.zadd(dailyKey, { member: username, score });
     await redis.expire(dailyKey, 86400 * 7); // 7 days retention
 
     // Update weekly leaderboard
     const weeklyKey = `leaderboard:weekly:${this.getWeekKey()}`;
-    await redis.zAdd(weeklyKey, { member: username, score });
+    await redis.zadd(weeklyKey, { member: username, score });
     await redis.expire(weeklyKey, 86400 * 30); // 30 days retention
 
     // Update player stats
@@ -49,7 +49,7 @@ export class LeaderboardService {
     won: boolean
   ): Promise<void> {
     const statsKey = `player:${username}:stats`;
-    const currentStats = await redis.hGetAll(statsKey);
+    const currentStats = (await redis.hgetall(statsKey) as any);
 
     const stats: PlayerStats = {
       username,
@@ -68,7 +68,7 @@ export class LeaderboardService {
     stats.kdRatio = stats.totalDeaths > 0 ? stats.totalKills / stats.totalDeaths : stats.totalKills;
 
     // Save stats
-    await redis.hSet(statsKey, {
+    await redis.hset(statsKey, {
       username: stats.username,
       totalKills: stats.totalKills.toString(),
       totalDeaths: stats.totalDeaths.toString(),
@@ -90,26 +90,23 @@ export class LeaderboardService {
     const weeklyKey = `subreddit:${subredditName}:weekly:${this.getWeekKey()}`;
 
     // Update all-time stats
-    await redis.hIncrBy(statsKey, 'totalVampiresKilled', vampireKills);
-    await redis.hIncrBy(statsKey, 'totalMatches', 1);
+    await redis.hincrby(statsKey, 'totalVampiresKilled', vampireKills);
+    await redis.hincrby(statsKey, 'totalMatches', 1);
 
     // Update weekly stats
-    await redis.hIncrBy(weeklyKey, 'vampiresKilled', vampireKills);
-    await redis.hIncrBy(weeklyKey, 'matches', 1);
+    await redis.hincrby(weeklyKey, 'vampiresKilled', vampireKills);
+    await redis.hincrby(weeklyKey, 'matches', 1);
     await redis.expire(weeklyKey, 86400 * 30); // 30 days retention
 
     // Track unique players (using a simple counter for now)
-    await redis.hIncrBy(statsKey, 'uniquePlayers', 1);
+    await redis.hincrby(statsKey, 'uniquePlayers', 1);
   }
 
   /**
    * Get global leaderboard
    */
   static async getGlobalLeaderboard(limit: number = TOP_DISPLAY): Promise<LeaderboardEntry[]> {
-    const results = await redis.zRange('leaderboard:global:alltime', 0, limit - 1, {
-      by: 'rank',
-      reverse: true,
-    });
+    const results = (await redis.zrange('leaderboard:global:alltime', 0, limit - 1, { rev: true }) as any[]);
 
     return results.map((item, index) => ({
       rank: index + 1,
@@ -125,10 +122,7 @@ export class LeaderboardService {
     subredditName: string,
     limit: number = TOP_DISPLAY
   ): Promise<LeaderboardEntry[]> {
-    const results = await redis.zRange(`leaderboard:subreddit:${subredditName}`, 0, limit - 1, {
-      by: 'rank',
-      reverse: true,
-    });
+    const results = (await redis.zrange(`leaderboard:subreddit:${subredditName}`, 0, limit - 1, { rev: true }) as any[]);
 
     return results.map((item, index) => ({
       rank: index + 1,
@@ -142,7 +136,7 @@ export class LeaderboardService {
    */
   static async getDailyLeaderboard(limit: number = TOP_DISPLAY): Promise<LeaderboardEntry[]> {
     const dailyKey = `leaderboard:daily:${this.getDayKey()}`;
-    const results = await redis.zRange(dailyKey, 0, limit - 1, { by: 'rank', reverse: true });
+    const results = (await redis.zrange(dailyKey, 0, limit - 1, { rev: true }) as any[]);
 
     return results.map((item, index) => ({
       rank: index + 1,
@@ -156,7 +150,7 @@ export class LeaderboardService {
    */
   static async getWeeklyLeaderboard(limit: number = TOP_DISPLAY): Promise<LeaderboardEntry[]> {
     const weeklyKey = `leaderboard:weekly:${this.getWeekKey()}`;
-    const results = await redis.zRange(weeklyKey, 0, limit - 1, { by: 'rank', reverse: true });
+    const results = (await redis.zrange(weeklyKey, 0, limit - 1, { rev: true }) as any[]);
 
     return results.map((item, index) => ({
       rank: index + 1,
@@ -170,7 +164,7 @@ export class LeaderboardService {
    */
   static async getPlayerStats(username: string): Promise<PlayerStats | null> {
     const statsKey = `player:${username}:stats`;
-    const data = await redis.hGetAll(statsKey);
+    const data = (await redis.hgetall(statsKey) as any);
 
     if (!data || Object.keys(data).length === 0) {
       return null;
@@ -194,7 +188,7 @@ export class LeaderboardService {
    * Get player rank in global leaderboard
    */
   static async getPlayerRank(username: string): Promise<number> {
-    const rank = await redis.zRank('leaderboard:global:alltime', username);
+    const rank = await redis.zrank('leaderboard:global:alltime', username);
     return rank !== undefined ? rank + 1 : 0; // Convert to 1-based rank
   }
 
@@ -206,8 +200,8 @@ export class LeaderboardService {
     const weeklyKey = `subreddit:${subredditName}:weekly:${this.getWeekKey()}`;
 
     const [allTimeData, weeklyData] = await Promise.all([
-      redis.hGetAll(statsKey),
-      redis.hGetAll(weeklyKey),
+      redis.hgetall(statsKey),
+      redis.hgetall(weeklyKey),
     ]);
 
     return {
