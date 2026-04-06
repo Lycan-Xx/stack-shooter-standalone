@@ -65,23 +65,9 @@ export class Vampire {
   }
 
   draw(ctx) {
-    if (this.images.vampire.complete) {
-      ctx.save();
-      ctx.translate(this.x, this.y);
-
-      const dx = this.player.x - this.x;
-      if (dx < 0) {
-        ctx.scale(-1, 1);
-      }
-
-      ctx.drawImage(this.images.vampire, -this.size / 2, -this.size / 2, this.size, this.size);
-      ctx.restore();
-    } else {
-      ctx.fillStyle = this.color;
-      ctx.beginPath();
-      ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-      ctx.fill();
-    }
+    const dx = this.player.x - this.x;
+    const facingLeft = dx < 0;
+    drawVampire(ctx, this.x, this.y, this.size, facingLeft, this.health / this.maxHealth);
 
     if (this.health < this.maxHealth) {
       const barWidth = 50;
