@@ -287,6 +287,9 @@ export function useGameLoop(canvasRef) {
           showFloatingText(enemy.x, enemy.y, `+${enemy.scoreValue}`, '#ffff00');
         } else {
           soundManager.play('enemyHit');
+          // Ricochet effect on hit
+          const hitAngle = Math.atan2(enemy.y - player.y, enemy.x - player.x);
+          ricochetEffectsRef.current.push(new RicochetEffect(enemy.x, enemy.y, hitAngle + Math.PI));
         }
         
         pierceCount--;
