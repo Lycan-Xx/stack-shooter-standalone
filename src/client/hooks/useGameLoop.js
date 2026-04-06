@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { DIFFICULTY } from '../lib/difficulty.js';
 import { Vampire, Particle, BloodSplatter, FloatingText } from '../lib/entities.js';
+import { BossVampire } from '../lib/Boss.js';
+import { RicochetEffect } from '../lib/svgCharacters.js';
+import { drawPlayer } from '../lib/svgCharacters.js';
 import { tutorialSteps } from '../lib/tutorial.js';
 import { getRandomUpgrades, applyUpgrade } from '../lib/upgrades.js';
 import { soundManager } from '../lib/sound.js';
-import { loadImageWithFallback } from '../lib/imageLoader.js';
 
 export function useGameLoop(canvasRef) {
   const [gameState, setGameState] = useState('start');
@@ -85,48 +87,14 @@ export function useGameLoop(canvasRef) {
   const hitMarkersRef = useRef([]);
   const damageNumbersRef = useRef([]);
   const hitEffectsRef = useRef([]);
+  const ricochetEffectsRef = useRef([]);
   const imagesRef = useRef({
-    playerAvatar: new Image(), // Current player's Snoo
-    remoteAvatars: new Map(), // Remote players' Snoos
-    vampire: new Image(), // Vampire enemy image
+    playerAvatar: null,
+    remoteAvatars: new Map(),
+    vampire: new Image(),
   });
 
   useEffect(() => {
-    // Load vampire image with fallback
-    loadImageWithFallback('https://play.rosebud.ai/assets/Vampire Enemy.png?0u3E', 'vampire')
-      .then(img => {
-        imagesRef.current.vampire = img;
-      })
-      .catch(err => console.error('Error loading vampire image:', err));
-
-    // Load current user's Snoo avatar (primary player image)
-    fetch('/api/init')
-      .then(res => res.json())
-      .then(data => {
-        if (data.username) {
-          // Fetch user's Snoo avatar
-          fetch(`/api/user/avatar?username=${data.username}`)
-            .then(res => res.json())
-            .then(avatarData => {
-              if (avatarData.avatarUrl) {
-                const avatarImg = new Image();
-                avatarImg.crossOrigin = 'anonymous';
-                avatarImg.onload = () => {
-                  imagesRef.current.playerAvatar = avatarImg;
-                  // Use avatar as default player image too
-                  imagesRef.current.player = avatarImg;
-                };
-                avatarImg.onerror = () => {
-                  console.log('Failed to load avatar, using fallback circle');
-                };
-                avatarImg.src = avatarData.avatarUrl;
-              }
-            })
-            .catch(err => console.error('Error fetching avatar:', err));
-        }
-      })
-      .catch(err => console.error('Error fetching user info:', err));
-
     // Initialize joystick input
     window.joystickInput = { x: 0, y: 0 };
   }, []);
@@ -190,52 +158,61 @@ export function useGameLoop(canvasRef) {
       });
     }
 
-    game.expectedEnemies = numEnemies;
-    game.spawnedEnemies = 0;
+    // Boss wave every 3rd wave (wave 3, 6, 9, ...)
+    const isBossWave = game.wave % 3 === 0 && game.state === 'playing';
 
-    for (let i = 0; i < numEnemies; i++) {
-      setTimeout(() => {
-        if ((game.state !== 'playing' && game.state !== 'tutorial') || !game.waveInProgress) {
-          return;
-        }
+    if (isBossWave) {
+      game.expectedEnemies = 1;
+      game.spawnedEnemies = 0;
 
-        const side = Math.floor(Math.random() * 4);
-        let x, y;
+      const side = Math.floor(Math.random() * 4);
+      let x, y;
+      switch (side) {
+        case 0: x = canvas.width / 2; y = -80; break;
+        case 1: x = canvas.width + 80; y = canvas.height / 2; break;
+        case 2: x = canvas.width / 2; y = canvas.height + 80; break;
+        case 3: x = -80; y = canvas.height / 2; break;
+      }
 
-        switch (side) {
-          case 0:
-            x = Math.random() * canvas.width;
-            y = -50;
-            break;
-          case 1:
-            x = canvas.width + 50;
-            y = Math.random() * canvas.height;
-            break;
-          case 2:
-            x = Math.random() * canvas.width;
-            y = canvas.height + 50;
-            break;
-          case 3:
-            x = -50;
-            y = Math.random() * canvas.height;
-            break;
-        }
+      const boss = new BossVampire(
+        x, y, game.wave, game.difficulty,
+        playerRef.current, numEnemies, game.challengeData
+      );
+      enemiesRef.current.push(boss);
+      game.spawnedEnemies = 1;
 
-        const vampire = new Vampire(
-          x,
-          y,
-          game.wave,
-          game.difficulty,
-          imagesRef.current,
-          playerRef.current,
-          game.challengeData
-        );
-        enemiesRef.current.push(vampire);
-        game.spawnedEnemies++;
-      }, i * 400);
+      showWaveInfo(`⚔ BOSS WAVE ${game.wave} ⚔`);
+    } else {
+      game.expectedEnemies = numEnemies;
+      game.spawnedEnemies = 0;
+
+      for (let i = 0; i < numEnemies; i++) {
+        setTimeout(() => {
+          if ((game.state !== 'playing' && game.state !== 'tutorial') || !game.waveInProgress) {
+            return;
+          }
+
+          const side = Math.floor(Math.random() * 4);
+          let x, y;
+
+          switch (side) {
+            case 0: x = Math.random() * canvas.width; y = -50; break;
+            case 1: x = canvas.width + 50; y = Math.random() * canvas.height; break;
+            case 2: x = Math.random() * canvas.width; y = canvas.height + 50; break;
+            case 3: x = -50; y = Math.random() * canvas.height; break;
+          }
+
+          const vampire = new Vampire(
+            x, y, game.wave, game.difficulty,
+            imagesRef.current, playerRef.current, game.challengeData
+          );
+          enemiesRef.current.push(vampire);
+          game.spawnedEnemies++;
+        }, i * 400);
+      }
+
+      showWaveInfo(`Wave ${game.wave}`);
     }
-
-    showWaveInfo(`Wave ${game.wave}`);
   };
 
   const shoot = () => {
@@ -310,6 +287,9 @@ export function useGameLoop(canvasRef) {
           showFloatingText(enemy.x, enemy.y, `+${enemy.scoreValue}`, '#ffff00');
         } else {
           soundManager.play('enemyHit');
+          // Ricochet effect on hit
+          const hitAngle = Math.atan2(enemy.y - player.y, enemy.x - player.x);
+          ricochetEffectsRef.current.push(new RicochetEffect(enemy.x, enemy.y, hitAngle + Math.PI));
         }
         
         pierceCount--;
@@ -563,6 +543,13 @@ export function useGameLoop(canvasRef) {
     }
   };
 
+  // Throttle HUD updates to every 3 frames for performance
+  let hudFrameCounter = 0;
+  const throttledUpdateHUD = () => {
+    hudFrameCounter++;
+    if (hudFrameCounter % 3 === 0) updateHUD();
+  };
+
   const update = () => {
     const game = gameRef.current;
     const player = playerRef.current;
@@ -574,7 +561,6 @@ export function useGameLoop(canvasRef) {
 
     if (player.dashCooldown > 0) {
       player.dashCooldown = Math.max(0, player.dashCooldown - 16);
-      updateHUD();
     }
 
     if (player.dashEnergy < player.maxDashEnergy) {
@@ -582,8 +568,9 @@ export function useGameLoop(canvasRef) {
         player.maxDashEnergy,
         player.dashEnergy + player.dashEnergyRegen
       );
-      updateHUD();
     }
+
+    throttledUpdateHUD();
 
     const joystickInput = window.joystickInput || { x: 0, y: 0 };
 
@@ -625,52 +612,48 @@ export function useGameLoop(canvasRef) {
     const bloodSplatters = bloodSplattersRef.current;
     const floatingTexts = floatingTextsRef.current;
 
-    // Bullet collision is now handled in shoot() function via hitscan
-
     for (let i = enemies.length - 1; i >= 0; i--) {
       if (enemies[i]) {
         enemies[i].update(canvas, updateHUD, gameOver);
       }
     }
 
+    // Cap particle arrays for performance
+    if (particles.length > 200) particles.splice(0, particles.length - 200);
+    if (bloodSplatters.length > 30) bloodSplatters.splice(0, bloodSplatters.length - 30);
+
     for (let i = particles.length - 1; i >= 0; i--) {
-      if (!particles[i].update()) {
-        particles.splice(i, 1);
-      }
+      if (!particles[i].update()) particles.splice(i, 1);
     }
 
     for (let i = bloodSplatters.length - 1; i >= 0; i--) {
-      if (!bloodSplatters[i].update()) {
-        bloodSplatters.splice(i, 1);
-      }
+      if (!bloodSplatters[i].update()) bloodSplatters.splice(i, 1);
     }
 
     for (let i = floatingTexts.length - 1; i >= 0; i--) {
-      if (!floatingTexts[i].update()) {
-        floatingTexts.splice(i, 1);
-      }
+      if (!floatingTexts[i].update()) floatingTexts.splice(i, 1);
     }
 
-    // Update visual effects
     const hitMarkers = hitMarkersRef.current;
     for (let i = hitMarkers.length - 1; i >= 0; i--) {
-      if (!hitMarkers[i].update()) {
-        hitMarkers.splice(i, 1);
-      }
+      if (!hitMarkers[i].update()) hitMarkers.splice(i, 1);
     }
 
     const damageNumbers = damageNumbersRef.current;
     for (let i = damageNumbers.length - 1; i >= 0; i--) {
-      if (!damageNumbers[i].update()) {
-        damageNumbers.splice(i, 1);
-      }
+      if (!damageNumbers[i].update()) damageNumbers.splice(i, 1);
     }
 
     const hitEffects = hitEffectsRef.current;
     for (let i = hitEffects.length - 1; i >= 0; i--) {
-      if (!hitEffects[i].update()) {
-        hitEffects.splice(i, 1);
-      }
+      if (!hitEffects[i].update()) hitEffects.splice(i, 1);
+    }
+
+    // Update ricochet effects
+    const ricochets = ricochetEffectsRef.current;
+    if (ricochets.length > 20) ricochets.splice(0, ricochets.length - 20);
+    for (let i = ricochets.length - 1; i >= 0; i--) {
+      if (!ricochets[i].update()) ricochets.splice(i, 1);
     }
 
     // Wave completion logic
@@ -690,7 +673,6 @@ export function useGameLoop(canvasRef) {
 
         soundManager.play('waveComplete');
         
-        // Get difficulty settings (use normal for challenge mode)
         const diff = game.difficulty === 'challenge' ? DIFFICULTY.normal : DIFFICULTY[game.difficulty];
         const bonus = 50 * diff.scoreMultiplier;
         
@@ -753,49 +735,10 @@ export function useGameLoop(canvasRef) {
       ctx.setLineDash([]);
       ctx.restore();
 
-      // Draw local player
-      // Use Snoo avatar (playerAvatar is set from Reddit)
-      const playerImage = imagesRef.current.playerAvatar;
+      // Draw local player using SVG character
+      drawPlayer(ctx, player.x, player.y, player.size, player.angle, player.isDashing);
 
-      if (playerImage && playerImage.complete && playerImage.src) {
-        ctx.save();
-        ctx.translate(player.x, player.y);
-        ctx.rotate(player.angle);
-        
-        // Draw avatar (no clip - was causing flickering)
-        ctx.drawImage(
-          playerImage,
-          -player.size / 2,
-          -player.size / 2,
-          player.size,
-          player.size
-        );
-        
-        // Draw direction indicator (arrow)
-        ctx.strokeStyle = '#4caf50';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.moveTo(player.radius * 0.5, 0);
-        ctx.lineTo(player.radius, 0);
-        ctx.stroke();
-        
-        ctx.restore();
-      } else {
-        ctx.fillStyle = '#4a90e2';
-        ctx.beginPath();
-        ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Draw direction indicator
-        ctx.strokeStyle = '#4caf50';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.moveTo(player.x, player.y);
-        ctx.lineTo(player.x + Math.cos(player.angle) * player.radius, player.y + Math.sin(player.angle) * player.radius);
-        ctx.stroke();
-      }
-
-      // Draw enemies (solo mode only - client-side)
+      // Draw enemies
       enemiesRef.current.forEach((enemy) => enemy.draw(ctx));
 
       // Draw lasers
@@ -803,7 +746,7 @@ export function useGameLoop(canvasRef) {
         const now = Date.now();
         game.lasers = game.lasers.filter(laser => {
           const age = now - laser.createdAt;
-          if (age > 100) return false; // Laser lasts 100ms
+          if (age > 100) return false;
           
           laser.alpha = 1 - (age / 100);
           
@@ -823,7 +766,7 @@ export function useGameLoop(canvasRef) {
         });
       }
 
-      // Always draw particles and effects
+      // Draw particles and effects
       particlesRef.current.forEach((particle) => particle.draw(ctx));
       bloodSplattersRef.current.forEach((splatter) => splatter.draw(ctx));
       floatingTextsRef.current.forEach((text) => text.draw(ctx));
@@ -832,6 +775,9 @@ export function useGameLoop(canvasRef) {
       hitMarkersRef.current.forEach((marker) => marker.draw(ctx));
       damageNumbersRef.current.forEach((number) => number.draw(ctx));
       hitEffectsRef.current.forEach((effect) => effect.draw(ctx));
+
+      // Draw ricochet effects
+      ricochetEffectsRef.current.forEach((ricochet) => ricochet.draw(ctx));
     }
   };
 
