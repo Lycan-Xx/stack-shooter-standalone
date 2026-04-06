@@ -1,6 +1,7 @@
 // Game entities
 import { DIFFICULTY } from './difficulty.js';
 import { soundManager } from './sound.js';
+import { drawVampire } from './svgCharacters.js';
 
 export class Vampire {
   constructor(x, y, wave, difficulty, images, player, challengeData = null) {
@@ -8,7 +9,6 @@ export class Vampire {
     this.y = y;
     this.radius = 30;
     this.size = 60;
-    this.images = images;
     this.player = player;
 
     const diff = difficulty === 'challenge' ? DIFFICULTY.normal : DIFFICULTY[difficulty];
