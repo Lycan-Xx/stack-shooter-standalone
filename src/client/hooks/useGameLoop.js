@@ -87,48 +87,14 @@ export function useGameLoop(canvasRef) {
   const hitMarkersRef = useRef([]);
   const damageNumbersRef = useRef([]);
   const hitEffectsRef = useRef([]);
+  const ricochetEffectsRef = useRef([]);
   const imagesRef = useRef({
-    playerAvatar: new Image(), // Current player's Snoo
-    remoteAvatars: new Map(), // Remote players' Snoos
-    vampire: new Image(), // Vampire enemy image
+    playerAvatar: null,
+    remoteAvatars: new Map(),
+    vampire: new Image(),
   });
 
   useEffect(() => {
-    // Load vampire image with fallback
-    loadImageWithFallback('https://play.rosebud.ai/assets/Vampire Enemy.png?0u3E', 'vampire')
-      .then(img => {
-        imagesRef.current.vampire = img;
-      })
-      .catch(err => console.error('Error loading vampire image:', err));
-
-    // Load current user's Snoo avatar (primary player image)
-    fetch('/api/init')
-      .then(res => res.json())
-      .then(data => {
-        if (data.username) {
-          // Fetch user's Snoo avatar
-          fetch(`/api/user/avatar?username=${data.username}`)
-            .then(res => res.json())
-            .then(avatarData => {
-              if (avatarData.avatarUrl) {
-                const avatarImg = new Image();
-                avatarImg.crossOrigin = 'anonymous';
-                avatarImg.onload = () => {
-                  imagesRef.current.playerAvatar = avatarImg;
-                  // Use avatar as default player image too
-                  imagesRef.current.player = avatarImg;
-                };
-                avatarImg.onerror = () => {
-                  console.log('Failed to load avatar, using fallback circle');
-                };
-                avatarImg.src = avatarData.avatarUrl;
-              }
-            })
-            .catch(err => console.error('Error fetching avatar:', err));
-        }
-      })
-      .catch(err => console.error('Error fetching user info:', err));
-
     // Initialize joystick input
     window.joystickInput = { x: 0, y: 0 };
   }, []);
