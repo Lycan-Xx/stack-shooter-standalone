@@ -158,52 +158,61 @@ export function useGameLoop(canvasRef) {
       });
     }
 
-    game.expectedEnemies = numEnemies;
-    game.spawnedEnemies = 0;
+    // Boss wave every 3rd wave (wave 3, 6, 9, ...)
+    const isBossWave = game.wave % 3 === 0 && game.state === 'playing';
 
-    for (let i = 0; i < numEnemies; i++) {
-      setTimeout(() => {
-        if ((game.state !== 'playing' && game.state !== 'tutorial') || !game.waveInProgress) {
-          return;
-        }
+    if (isBossWave) {
+      game.expectedEnemies = 1;
+      game.spawnedEnemies = 0;
 
-        const side = Math.floor(Math.random() * 4);
-        let x, y;
+      const side = Math.floor(Math.random() * 4);
+      let x, y;
+      switch (side) {
+        case 0: x = canvas.width / 2; y = -80; break;
+        case 1: x = canvas.width + 80; y = canvas.height / 2; break;
+        case 2: x = canvas.width / 2; y = canvas.height + 80; break;
+        case 3: x = -80; y = canvas.height / 2; break;
+      }
 
-        switch (side) {
-          case 0:
-            x = Math.random() * canvas.width;
-            y = -50;
-            break;
-          case 1:
-            x = canvas.width + 50;
-            y = Math.random() * canvas.height;
-            break;
-          case 2:
-            x = Math.random() * canvas.width;
-            y = canvas.height + 50;
-            break;
-          case 3:
-            x = -50;
-            y = Math.random() * canvas.height;
-            break;
-        }
+      const boss = new BossVampire(
+        x, y, game.wave, game.difficulty,
+        playerRef.current, numEnemies, game.challengeData
+      );
+      enemiesRef.current.push(boss);
+      game.spawnedEnemies = 1;
 
-        const vampire = new Vampire(
-          x,
-          y,
-          game.wave,
-          game.difficulty,
-          imagesRef.current,
-          playerRef.current,
-          game.challengeData
-        );
-        enemiesRef.current.push(vampire);
-        game.spawnedEnemies++;
-      }, i * 400);
+      showWaveInfo(`⚔ BOSS WAVE ${game.wave} ⚔`);
+    } else {
+      game.expectedEnemies = numEnemies;
+      game.spawnedEnemies = 0;
+
+      for (let i = 0; i < numEnemies; i++) {
+        setTimeout(() => {
+          if ((game.state !== 'playing' && game.state !== 'tutorial') || !game.waveInProgress) {
+            return;
+          }
+
+          const side = Math.floor(Math.random() * 4);
+          let x, y;
+
+          switch (side) {
+            case 0: x = Math.random() * canvas.width; y = -50; break;
+            case 1: x = canvas.width + 50; y = Math.random() * canvas.height; break;
+            case 2: x = Math.random() * canvas.width; y = canvas.height + 50; break;
+            case 3: x = -50; y = Math.random() * canvas.height; break;
+          }
+
+          const vampire = new Vampire(
+            x, y, game.wave, game.difficulty,
+            imagesRef.current, playerRef.current, game.challengeData
+          );
+          enemiesRef.current.push(vampire);
+          game.spawnedEnemies++;
+        }, i * 400);
+      }
+
+      showWaveInfo(`Wave ${game.wave}`);
     }
-
-    showWaveInfo(`Wave ${game.wave}`);
   };
 
   const shoot = () => {
