@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { DIFFICULTY } from '../lib/difficulty.js';
 import { Vampire, Particle, BloodSplatter, FloatingText } from '../lib/entities.js';
+import { BossVampire } from '../lib/Boss.js';
+import { RicochetEffect } from '../lib/svgCharacters.js';
+import { drawPlayer } from '../lib/svgCharacters.js';
 import { tutorialSteps } from '../lib/tutorial.js';
 import { getRandomUpgrades, applyUpgrade } from '../lib/upgrades.js';
 import { soundManager } from '../lib/sound.js';
-import { loadImageWithFallback } from '../lib/imageLoader.js';
 
 export function useGameLoop(canvasRef) {
   const [gameState, setGameState] = useState('start');
