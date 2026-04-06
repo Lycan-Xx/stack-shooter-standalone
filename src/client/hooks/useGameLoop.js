@@ -543,6 +543,13 @@ export function useGameLoop(canvasRef) {
     }
   };
 
+  // Throttle HUD updates to every 3 frames for performance
+  let hudFrameCounter = 0;
+  const throttledUpdateHUD = () => {
+    hudFrameCounter++;
+    if (hudFrameCounter % 3 === 0) updateHUD();
+  };
+
   const update = () => {
     const game = gameRef.current;
     const player = playerRef.current;
@@ -554,7 +561,6 @@ export function useGameLoop(canvasRef) {
 
     if (player.dashCooldown > 0) {
       player.dashCooldown = Math.max(0, player.dashCooldown - 16);
-      updateHUD();
     }
 
     if (player.dashEnergy < player.maxDashEnergy) {
@@ -562,8 +568,9 @@ export function useGameLoop(canvasRef) {
         player.maxDashEnergy,
         player.dashEnergy + player.dashEnergyRegen
       );
-      updateHUD();
     }
+
+    throttledUpdateHUD();
 
     const joystickInput = window.joystickInput || { x: 0, y: 0 };
 
@@ -605,52 +612,48 @@ export function useGameLoop(canvasRef) {
     const bloodSplatters = bloodSplattersRef.current;
     const floatingTexts = floatingTextsRef.current;
 
-    // Bullet collision is now handled in shoot() function via hitscan
-
     for (let i = enemies.length - 1; i >= 0; i--) {
       if (enemies[i]) {
         enemies[i].update(canvas, updateHUD, gameOver);
       }
     }
 
+    // Cap particle arrays for performance
+    if (particles.length > 200) particles.splice(0, particles.length - 200);
+    if (bloodSplatters.length > 30) bloodSplatters.splice(0, bloodSplatters.length - 30);
+
     for (let i = particles.length - 1; i >= 0; i--) {
-      if (!particles[i].update()) {
-        particles.splice(i, 1);
-      }
+      if (!particles[i].update()) particles.splice(i, 1);
     }
 
     for (let i = bloodSplatters.length - 1; i >= 0; i--) {
-      if (!bloodSplatters[i].update()) {
-        bloodSplatters.splice(i, 1);
-      }
+      if (!bloodSplatters[i].update()) bloodSplatters.splice(i, 1);
     }
 
     for (let i = floatingTexts.length - 1; i >= 0; i--) {
-      if (!floatingTexts[i].update()) {
-        floatingTexts.splice(i, 1);
-      }
+      if (!floatingTexts[i].update()) floatingTexts.splice(i, 1);
     }
 
-    // Update visual effects
     const hitMarkers = hitMarkersRef.current;
     for (let i = hitMarkers.length - 1; i >= 0; i--) {
-      if (!hitMarkers[i].update()) {
-        hitMarkers.splice(i, 1);
-      }
+      if (!hitMarkers[i].update()) hitMarkers.splice(i, 1);
     }
 
     const damageNumbers = damageNumbersRef.current;
     for (let i = damageNumbers.length - 1; i >= 0; i--) {
-      if (!damageNumbers[i].update()) {
-        damageNumbers.splice(i, 1);
-      }
+      if (!damageNumbers[i].update()) damageNumbers.splice(i, 1);
     }
 
     const hitEffects = hitEffectsRef.current;
     for (let i = hitEffects.length - 1; i >= 0; i--) {
-      if (!hitEffects[i].update()) {
-        hitEffects.splice(i, 1);
-      }
+      if (!hitEffects[i].update()) hitEffects.splice(i, 1);
+    }
+
+    // Update ricochet effects
+    const ricochets = ricochetEffectsRef.current;
+    if (ricochets.length > 20) ricochets.splice(0, ricochets.length - 20);
+    for (let i = ricochets.length - 1; i >= 0; i--) {
+      if (!ricochets[i].update()) ricochets.splice(i, 1);
     }
 
     // Wave completion logic
@@ -670,7 +673,6 @@ export function useGameLoop(canvasRef) {
 
         soundManager.play('waveComplete');
         
-        // Get difficulty settings (use normal for challenge mode)
         const diff = game.difficulty === 'challenge' ? DIFFICULTY.normal : DIFFICULTY[game.difficulty];
         const bonus = 50 * diff.scoreMultiplier;
         
