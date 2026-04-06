@@ -735,49 +735,10 @@ export function useGameLoop(canvasRef) {
       ctx.setLineDash([]);
       ctx.restore();
 
-      // Draw local player
-      // Use Snoo avatar (playerAvatar is set from Reddit)
-      const playerImage = imagesRef.current.playerAvatar;
+      // Draw local player using SVG character
+      drawPlayer(ctx, player.x, player.y, player.size, player.angle, player.isDashing);
 
-      if (playerImage && playerImage.complete && playerImage.src) {
-        ctx.save();
-        ctx.translate(player.x, player.y);
-        ctx.rotate(player.angle);
-        
-        // Draw avatar (no clip - was causing flickering)
-        ctx.drawImage(
-          playerImage,
-          -player.size / 2,
-          -player.size / 2,
-          player.size,
-          player.size
-        );
-        
-        // Draw direction indicator (arrow)
-        ctx.strokeStyle = '#4caf50';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.moveTo(player.radius * 0.5, 0);
-        ctx.lineTo(player.radius, 0);
-        ctx.stroke();
-        
-        ctx.restore();
-      } else {
-        ctx.fillStyle = '#4a90e2';
-        ctx.beginPath();
-        ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Draw direction indicator
-        ctx.strokeStyle = '#4caf50';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.moveTo(player.x, player.y);
-        ctx.lineTo(player.x + Math.cos(player.angle) * player.radius, player.y + Math.sin(player.angle) * player.radius);
-        ctx.stroke();
-      }
-
-      // Draw enemies (solo mode only - client-side)
+      // Draw enemies
       enemiesRef.current.forEach((enemy) => enemy.draw(ctx));
 
       // Draw lasers
@@ -785,7 +746,7 @@ export function useGameLoop(canvasRef) {
         const now = Date.now();
         game.lasers = game.lasers.filter(laser => {
           const age = now - laser.createdAt;
-          if (age > 100) return false; // Laser lasts 100ms
+          if (age > 100) return false;
           
           laser.alpha = 1 - (age / 100);
           
@@ -805,7 +766,7 @@ export function useGameLoop(canvasRef) {
         });
       }
 
-      // Always draw particles and effects
+      // Draw particles and effects
       particlesRef.current.forEach((particle) => particle.draw(ctx));
       bloodSplattersRef.current.forEach((splatter) => splatter.draw(ctx));
       floatingTextsRef.current.forEach((text) => text.draw(ctx));
@@ -814,6 +775,9 @@ export function useGameLoop(canvasRef) {
       hitMarkersRef.current.forEach((marker) => marker.draw(ctx));
       damageNumbersRef.current.forEach((number) => number.draw(ctx));
       hitEffectsRef.current.forEach((effect) => effect.draw(ctx));
+
+      // Draw ricochet effects
+      ricochetEffectsRef.current.forEach((ricochet) => ricochet.draw(ctx));
     }
   };
 
