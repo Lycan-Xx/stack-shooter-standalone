@@ -1,4 +1,4 @@
-import { redis } from '@devvit/web/server';
+import { redis } from './redis';
 import { PlayerStats, LeaderboardEntry, CommunityStats } from '../../shared/types/api';
 
 const TOP_DISPLAY = 10;

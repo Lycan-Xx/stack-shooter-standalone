@@ -1,4 +1,4 @@
-import { redis } from '@devvit/web/server';
+import { redis } from './redis';
 
 export type Squad = {
   id: string;
