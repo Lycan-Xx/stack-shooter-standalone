@@ -1,6 +1,6 @@
 // Tutorial system
 import { DIFFICULTY } from './difficulty.js';
-import { soundManager } from './sound.js';
+import { soundManager } from '../systems/sound.js';
 export const tutorialSteps = [
   {
     text: "Welcome, Hunter! 🧛\n\nVampires are attacking! Let's learn how to survive.\n\nUse WASD or Arrow Keys to move around.",

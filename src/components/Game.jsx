@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
-import { useGameLoop } from '../../engine/core/useGameLoop';
-import { soundManager } from '../../engine/systems/sound.js';
+import { useGameLoop } from '../engine/core/useGameLoop';
+import { soundManager } from '../engine/systems/sound.js';
 import HUD from './HUD';
 import StartScreen from './StartScreen';
 import GameOver from './GameOver';
@@ -8,12 +8,10 @@ import UpgradeScreen from './UpgradeScreen';
 import TutorialOverlay from './TutorialOverlay';
 import PauseMenu from './PauseMenu';
 import Controls from './Controls';
-import StatsModal from './StatsModal';
 import './Game.css';
 
 export default function Game() {
   const canvasRef = useRef(null);
-  const [showStats, setShowStats] = useState(false);
 
   const {
     gameState,
@@ -72,19 +70,10 @@ export default function Game() {
           <TutorialOverlay text={tutorialText} onContinue={continTutorial} />
         )}
 
-        {isPaused && (gameState === 'playing' || gameState === 'tutorial') && !showStats && (
+        {isPaused && (gameState === 'playing' || gameState === 'tutorial') && (
           <PauseMenu 
             onResume={togglePause} 
-            onExit={() => setShowStats(true)}
-          />
-        )}
-
-        {showStats && (
-          <StatsModal 
-            onClose={() => {
-              setShowStats(false);
-              restartGame();
-            }} 
+            onExit={restartGame}
           />
         )}
       </div>

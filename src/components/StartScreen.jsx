@@ -1,44 +1,12 @@
 import { useState, useEffect } from 'react';
-import Leaderboard from './Leaderboard';
-import DailyChallenge from './DailyChallenge';
-import SquadManager from './SquadManager';
 import DifficultySelect from './DifficultySelect';
 import './StartScreen.css';
 
 export default function StartScreen({ onStartGame, onStartTutorial }) {
-  const [view, setView] = useState('main'); // main, difficulty, leaderboard, challenge, squads
-  const [showLeaderboard, setShowLeaderboard] = useState(false);
-  const [showChallenge, setShowChallenge] = useState(false);
-  const [showSquads, setShowSquads] = useState(false);
+  const [view, setView] = useState('main'); // main, difficulty
   const [showHowToPlay, setShowHowToPlay] = useState(false);
-  const [communityStats, setCommunityStats] = useState(null);
-  const [playerStats, setPlayerStats] = useState(null);
 
-  useEffect(() => {
-    loadStats();
-  }, []);
-
-  const loadStats = async () => {
-    try {
-      const [communityRes, playerRes] = await Promise.all([
-        fetch('/api/stats/community'),
-        fetch('/api/stats/player')
-      ]);
-      
-      const communityData = await communityRes.json();
-      const playerData = await playerRes.json();
-      
-      if (communityData.success) {
-        setCommunityStats(communityData.stats);
-      }
-      
-      if (playerData.success) {
-        setPlayerStats(playerData.stats);
-      }
-    } catch (error) {
-      console.error('Error loading stats:', error);
-    }
-  };
+  // Start Screen view
 
   const formatNumber = (num) => {
     if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
@@ -78,29 +46,11 @@ export default function StartScreen({ onStartGame, onStartTutorial }) {
             <span className="btn-subtitle">Choose your difficulty</span>
           </button>
 
-          <button className="menu-btn challenge" onClick={() => setShowChallenge(true)}>
-            <span className="btn-icon">📅</span>
-            <span className="btn-text">Daily Challenge</span>
-            <span className="btn-subtitle">Today's special modifiers</span>
-          </button>
-
           <button className="menu-btn tutorial" onClick={onStartTutorial}>
             <span className="btn-icon">📚</span>
             <span className="btn-text">Tutorial</span>
             <span className="btn-subtitle">Learn the basics</span>
           </button>
-
-          <div className="menu-row">
-            <button className="menu-btn secondary" onClick={() => setShowSquads(true)}>
-              <span className="btn-icon">👥</span>
-              <span className="btn-text">Squads</span>
-            </button>
-
-            <button className="menu-btn secondary" onClick={() => setShowLeaderboard(true)}>
-              <span className="btn-icon">🏆</span>
-              <span className="btn-text">Leaderboards</span>
-            </button>
-          </div>
 
           <button className="menu-btn info" onClick={() => setShowHowToPlay(true)}>
             <span className="btn-icon">❓</span>
@@ -119,14 +69,7 @@ export default function StartScreen({ onStartGame, onStartTutorial }) {
         </div>
       </div>
 
-      {showLeaderboard && <Leaderboard onClose={() => setShowLeaderboard(false)} />}
-      {showChallenge && (
-        <DailyChallenge
-          onClose={() => setShowChallenge(false)}
-          onStartChallenge={(challenge) => onStartGame('challenge', challenge)}
-        />
-      )}
-      {showSquads && <SquadManager onClose={() => setShowSquads(false)} />}
+      {/* UI States were removed */}
       
       {showHowToPlay && (
         <div className="modal-overlay" onClick={() => setShowHowToPlay(false)}>
@@ -168,12 +111,11 @@ export default function StartScreen({ onStartGame, onStartTutorial }) {
                 </ul>
               </section>
               
-              <section>
-                <h3>🏆 Community Features</h3>
+               <section>
+                <h3>🏆 Game Objectives</h3>
                 <ul>
-                  <li><strong>Daily Challenges</strong> - Compete with unique modifiers</li>
-                  <li><strong>Squads</strong> - Team up and combine scores</li>
-                  <li><strong>Leaderboards</strong> - Global, Subreddit, Daily, Weekly</li>
+                  <li>Survive and beat the high score!</li>
+                  <li>Master the dash energy and aiming</li>
                 </ul>
               </section>
               
