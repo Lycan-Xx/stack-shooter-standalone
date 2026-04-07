@@ -1,7 +1,6 @@
-// Game entities
-import { DIFFICULTY } from './difficulty.js';
-import { soundManager } from './sound.js';
-import { drawVampire } from './svgCharacters.js';
+import { DIFFICULTY } from '../logic/difficulty.js';
+import { soundManager } from '../systems/sound.js';
+import { drawVampire } from '../systems/svgCharacters.js';
 
 export class Vampire {
   constructor(x, y, wave, difficulty, images, player, challengeData = null) {

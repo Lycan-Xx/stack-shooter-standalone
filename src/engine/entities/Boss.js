@@ -2,9 +2,9 @@
  * Boss enemy - spawns every 3rd wave instead of normal enemies
  * Has combined health and firepower of all enemies that would have spawned
  */
-import { DIFFICULTY } from './difficulty.js';
-import { soundManager } from './sound.js';
-import { drawBossVampire } from './svgCharacters.js';
+import { DIFFICULTY } from '../logic/difficulty.js';
+import { soundManager } from '../systems/sound.js';
+import { drawBossVampire } from '../systems/svgCharacters.js';
 
 export class BossVampire {
   constructor(x, y, wave, difficulty, player, numEnemiesReplaced, challengeData = null) {

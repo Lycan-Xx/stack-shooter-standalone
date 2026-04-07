@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
-import { useGameLoop } from '../hooks/useGameLoop';
-import { soundManager } from '../lib/sound.js';
+import { useGameLoop } from '../../engine/core/useGameLoop';
+import { soundManager } from '../../engine/systems/sound.js';
 import HUD from './HUD';
 import StartScreen from './StartScreen';
 import GameOver from './GameOver';
