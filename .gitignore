@@ -7,10 +7,13 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Node / build output
 node_modules
 dist
 dist-ssr
 *.local
+.vite
+.cache
 
 # Editor directories and files
 .vscode/*
@@ -22,3 +25,26 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# ── Rust / WASM engine ─────────────────────────────────────────────
+# Cargo build output for the engine-rs crate
+engine-rs/target/
+**/*.rs.bk
+
+# Cargo build output for the legacy standalone macroquad port
+RUST/target/
+stack-shooter-standalone/target/
+
+# wasm-pack output — regenerated from `engine-rs` on every build,
+# checked-out devs get it via `wasm-pack build`.
+src/engine/pkg/
+
+# wasm-pack logs / installer cache
+wasm-pack.log
+.wasm-pack/
+
+# ── OS / misc ──────────────────────────────────────────────────────
+*.tmp
+*.bak
+.env.local
+.env.*.local
