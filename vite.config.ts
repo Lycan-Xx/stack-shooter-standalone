@@ -5,6 +5,11 @@ import react from '@vitejs/plugin-react';
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react(), tailwind()],
+  server: {
+    host: '0.0.0.0',
+    port: 5000,
+    allowedHosts: true,
+  },
   build: {
     outDir: 'dist',
     sourcemap: true,

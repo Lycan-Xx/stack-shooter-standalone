@@ -1,32 +1,45 @@
+// useGameLoop.js — React hook that drives the Rust/WASM game engine.
+// All per-frame physics/AI/collision lives in Rust (engine/pkg). This file
+// owns React state, input collection, audio, wave spawning, upgrades, the
+// tutorial state machine, and Canvas 2D rendering (which reads flat
+// f32 buffers exposed by the engine).
+
 import { useEffect, useRef, useState } from 'react';
 import { DIFFICULTY } from '../logic/difficulty.js';
-import { Vampire, Particle, BloodSplatter, FloatingText } from '../entities/entities.js';
-import { BossVampire } from '../entities/Boss.js';
+import { drawVampire, drawBossVampire } from '../systems/svgCharacters.js';
 import { RicochetEffect, drawPlayer } from '../systems/svgCharacters.js';
 import { tutorialSteps } from '../logic/tutorial.js';
 import { getRandomUpgrades, applyUpgrade } from '../logic/upgrades.js';
 import { soundManager } from '../systems/sound.js';
 
+import init, { Engine } from '../pkg/vampire_engine.js';
+import wasmUrl from '../pkg/vampire_engine_bg.wasm?url';
+
+// Engine-side bit flags (must mirror lib.rs)
+const EV_PLAYER_HURT = 1 << 0;
+const EV_GAME_OVER   = 1 << 1;
+
 export function useGameLoop(canvasRef) {
   const [gameState, setGameState] = useState('start');
   const [hudData, setHudData] = useState({
-    health: 100,
-    maxHealth: 100,
-    wave: 1,
-    enemies: 0,
-    kills: 0,
-    score: 0,
-    dashEnergy: 100,
-    maxDashEnergy: 100,
-    dashCooldown: 0,
-    maxDashCooldown: 4000,
+    health: 100, maxHealth: 100,
+    wave: 1, enemies: 0, kills: 0, score: 0,
+    dashEnergy: 100, maxDashEnergy: 100,
+    dashCooldown: 0, maxDashCooldown: 4000,
   });
   const [difficulty, setDifficulty] = useState('normal');
   const [difficultyBadge, setDifficultyBadge] = useState('😐 NORMAL MODE');
   const [upgradeOptions, setUpgradeOptions] = useState([]);
   const [tutorialText, setTutorialText] = useState('');
   const [wasdKeys, setWasdKeys] = useState(new Set());
+  const [isPaused, setIsPaused] = useState(false);
 
+  // Engine + WASM memory view (set after init)
+  const engineRef = useRef(null);
+  const memRef    = useRef(null);
+  const readyRef  = useRef(false);
+
+  // Game-meta state (lives in JS — not part of physics)
   const gameRef = useRef({
     state: 'start',
     wave: 1,
@@ -34,6 +47,7 @@ export function useGameLoop(canvasRef) {
     score: 0,
     paused: false,
     difficulty: 'normal',
+    challengeData: null,
     tutorialStep: 0,
     waveInProgress: false,
     waitingForNextWave: false,
@@ -41,355 +55,199 @@ export function useGameLoop(canvasRef) {
     spawnedEnemies: 0,
     isFirstGame: true,
     lasers: [],
+    upgrades: {},        // { maxHealth: 2, damage: 1, ... }
+    lastFrameMs: 0,
   });
 
-  const [isPaused, setIsPaused] = useState(false);
-
-  const playerRef = useRef({
-    x: 0,
-    y: 0,
-    radius: 30,
-    size: 60,
-    health: 100,
-    maxHealth: 100,
-    speed: 5,
-    angle: 0,
-    isDashing: false,
-    dashCooldown: 0,
-    maxDashCooldown: 4000,
-    dashDuration: 200,
-    dashSpeed: 15,
-    dashEnergy: 100,
-    maxDashEnergy: 100,
-    dashEnergyRegen: 0.5,
-    weapon: {
-      ammo: 999,
-      maxAmmo: 999,
-      clipSize: 999,
-      damage: 50,
-      fireRate: 300,
-      reloadTime: 0,
-      lastShot: 0,
-      isReloading: false,
-      piercing: 0,
-    },
-    upgrades: {},
-  });
-
+  // Input refs
   const mouseRef = useRef({ x: 0, y: 0, down: false });
   const keysRef = useRef({});
-  const bulletsRef = useRef([]);
-  const enemiesRef = useRef([]);
-  const particlesRef = useRef([]);
-  const bloodSplattersRef = useRef([]);
-  const floatingTextsRef = useRef([]);
-  const hitMarkersRef = useRef([]);
-  const damageNumbersRef = useRef([]);
-  const hitEffectsRef = useRef([]);
-  const ricochetEffectsRef = useRef([]);
-  const imagesRef = useRef({
-    playerAvatar: null,
-    remoteAvatars: new Map(),
-    vampire: new Image(),
-  });
 
+  // Visual-only effect lists (small, kept in JS)
+  const ricochetEffectsRef = useRef([]);
+
+  // ── Engine init ──────────────────────────────────────────────────────
   useEffect(() => {
-    // Initialize joystick input
+    let cancelled = false;
+    (async () => {
+      const wasm = await init({ module_or_path: wasmUrl });
+      if (cancelled) return;
+      engineRef.current = new Engine();
+      memRef.current = wasm.memory;
+      readyRef.current = true;
+    })();
     window.joystickInput = { x: 0, y: 0 };
+    return () => { cancelled = true; };
   }, []);
 
+  // ── HUD sync (throttled) ─────────────────────────────────────────────
+  let hudFrame = 0;
   const updateHUD = () => {
-    const player = playerRef.current;
+    const e = engineRef.current;
     const game = gameRef.current;
-
+    if (!e) return;
     setHudData({
-      health: player.health,
-      maxHealth: player.maxHealth,
+      health: e.player_health(),
+      maxHealth: e.player_max_health(),
       wave: game.wave,
-      enemies: enemiesRef.current.length,
+      enemies: e.enemies_len(),
       kills: game.kills,
       score: game.score,
-      dashEnergy: player.dashEnergy,
-      maxDashEnergy: player.maxDashEnergy,
-      dashCooldown: player.dashCooldown,
-      maxDashCooldown: player.maxDashCooldown,
-      powerUps: player.powerUps || [],
+      dashEnergy: e.player_dash_energy(),
+      maxDashEnergy: e.player_max_dash_energy(),
+      dashCooldown: e.player_dash_cooldown(),
+      maxDashCooldown: e.player_max_dash_cooldown(),
       difficulty: game.difficulty,
     });
   };
+  const throttledUpdateHUD = () => { if (++hudFrame % 3 === 0) updateHUD(); };
 
-  const showFloatingText = (x, y, text, color) => {
-    floatingTextsRef.current.push(new FloatingText(x, y, text, color));
+  // ── Wave spawning ────────────────────────────────────────────────────
+  const showWaveInfo = (text) => {
+    const el = document.getElementById('wave-info');
+    if (el) {
+      el.textContent = text;
+      el.style.opacity = '1';
+      setTimeout(() => { el.style.opacity = '0'; }, 2000);
+    }
   };
 
-  const showWaveInfo = (text) => {
-    const waveInfo = document.getElementById('wave-info');
-    if (waveInfo) {
-      waveInfo.textContent = text;
-      waveInfo.style.opacity = '1';
-      setTimeout(() => {
-        waveInfo.style.opacity = '0';
-      }, 2000);
+  const computeChallengeMults = () => {
+    let healthMult = 1, speedMult = 1, scoreMult = 1, enemyCountMult = 1,
+        playerSpeedMult = 1, playerDamageMult = 1;
+    const cd = gameRef.current.challengeData;
+    if (cd?.modifiers) {
+      cd.modifiers.forEach(m => {
+        if (m.effect.enemyHealthMultiplier) healthMult *= m.effect.enemyHealthMultiplier;
+        if (m.effect.enemySpeedMultiplier)  speedMult  *= m.effect.enemySpeedMultiplier;
+        if (m.effect.scoreMultiplier)       scoreMult  *= m.effect.scoreMultiplier;
+        if (m.effect.enemyCountMultiplier)  enemyCountMult *= m.effect.enemyCountMultiplier;
+        if (m.effect.playerSpeedMultiplier) playerSpeedMult *= m.effect.playerSpeedMultiplier;
+        if (m.effect.playerDamageMultiplier) playerDamageMult *= m.effect.playerDamageMultiplier;
+      });
     }
+    return { healthMult, speedMult, scoreMult, enemyCountMult, playerSpeedMult, playerDamageMult };
   };
 
   const spawnWave = () => {
     const game = gameRef.current;
     const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    if (game.waveInProgress) return;
+    const e = engineRef.current;
+    if (!canvas || !e || game.waveInProgress) return;
 
     game.waveInProgress = true;
     game.waitingForNextWave = false;
 
-    const diff = game.difficulty === 'challenge' ? DIFFICULTY.normal : DIFFICULTY[game.difficulty];
-    const baseEnemies =
-      game.state === 'tutorial' && game.tutorialStep < 5 ? 1 : diff.enemiesPerWave;
-    let numEnemies = baseEnemies + Math.floor((game.wave - 1) * 0.5);
-    
-    // Apply challenge enemy count multiplier
-    if (game.challengeData && game.challengeData.modifiers) {
-      game.challengeData.modifiers.forEach(mod => {
-        if (mod.effect.enemyCountMultiplier) {
-          numEnemies = Math.floor(numEnemies * mod.effect.enemyCountMultiplier);
-        }
-      });
-    }
+    const diffKey = game.difficulty === 'challenge' ? 'normal' : game.difficulty;
+    const diff = DIFFICULTY[diffKey];
+    const mults = computeChallengeMults();
 
-    // Boss wave every 3rd wave (wave 3, 6, 9, ...)
+    const baseEnemies = (game.state === 'tutorial' && game.tutorialStep < 5)
+      ? 1 : diff.enemiesPerWave;
+    let numEnemies = Math.floor((baseEnemies + (game.wave - 1) * 0.5) * mults.enemyCountMult);
+
+    const enemyHp = (diff.enemyHealth + Math.floor((game.wave - 1) * 5)) * mults.healthMult;
+    const enemySpeed = (diff.enemySpeed + Math.min((game.wave - 1) * 0.03, 0.5)) * mults.speedMult;
+    const enemyDamage = diff.enemyDamage;
+    const score = 10 * diff.scoreMultiplier * mults.scoreMult;
+
     const isBossWave = game.wave % 3 === 0 && game.state === 'playing';
 
     if (isBossWave) {
       game.expectedEnemies = 1;
       game.spawnedEnemies = 0;
-
       const side = Math.floor(Math.random() * 4);
       let x, y;
       switch (side) {
         case 0: x = canvas.width / 2; y = -80; break;
         case 1: x = canvas.width + 80; y = canvas.height / 2; break;
         case 2: x = canvas.width / 2; y = canvas.height + 80; break;
-        case 3: x = -80; y = canvas.height / 2; break;
+        default: x = -80; y = canvas.height / 2;
       }
-
-      const boss = new BossVampire(
-        x, y, game.wave, game.difficulty,
-        playerRef.current, numEnemies, game.challengeData
-      );
-      enemiesRef.current.push(boss);
+      const bossHp = enemyHp * numEnemies;
+      const bossSpeed = enemySpeed * 0.7;
+      const bossDmg = enemyDamage * 2;
+      const bossScore = score * numEnemies;
+      e.spawn_boss(x, y, bossHp, bossSpeed, bossDmg, bossScore);
       game.spawnedEnemies = 1;
-
       showWaveInfo(`⚔ BOSS WAVE ${game.wave} ⚔`);
     } else {
       game.expectedEnemies = numEnemies;
       game.spawnedEnemies = 0;
-
       for (let i = 0; i < numEnemies; i++) {
         setTimeout(() => {
-          if ((game.state !== 'playing' && game.state !== 'tutorial') || !game.waveInProgress) {
-            return;
-          }
-
+          if ((game.state !== 'playing' && game.state !== 'tutorial') || !game.waveInProgress) return;
           const side = Math.floor(Math.random() * 4);
           let x, y;
-
           switch (side) {
             case 0: x = Math.random() * canvas.width; y = -50; break;
             case 1: x = canvas.width + 50; y = Math.random() * canvas.height; break;
             case 2: x = Math.random() * canvas.width; y = canvas.height + 50; break;
-            case 3: x = -50; y = Math.random() * canvas.height; break;
+            default: x = -50; y = Math.random() * canvas.height;
           }
-
-          const vampire = new Vampire(
-            x, y, game.wave, game.difficulty,
-            imagesRef.current, playerRef.current, game.challengeData
-          );
-          enemiesRef.current.push(vampire);
+          e.spawn_vampire(x, y, enemyHp, enemySpeed, enemyDamage, score);
           game.spawnedEnemies++;
         }, i * 400);
       }
-
       showWaveInfo(`Wave ${game.wave}`);
     }
   };
 
-  const shoot = () => {
-    const player = playerRef.current;
-    const mouse = mouseRef.current;
+  // ── Player setup helpers ─────────────────────────────────────────────
+  const applyDifficultyToEngine = () => {
     const game = gameRef.current;
-    const now = Date.now();
-
-    // Check fire rate with power-up bonus
-    const fireRatePowerUp = player.powerUps?.find((p) => p.type === 'fireRate');
-    const fireRate = fireRatePowerUp
-      ? player.weapon.fireRate * fireRatePowerUp.value
-      : player.weapon.fireRate;
-
-    if (now - player.weapon.lastShot < fireRate) return;
-
-    player.weapon.lastShot = now;
-
-    const angle = Math.atan2(mouse.y - player.y, mouse.x - player.x);
-
-    // HITSCAN: Instant laser hit detection (solo mode only)
-      const dirX = Math.cos(angle);
-      const dirY = Math.sin(angle);
-      
-      // Check hits against enemies
-      let pierceCount = player.weapon.piercing;
-      const hitEnemies = [];
-      
-      for (const enemy of enemiesRef.current) {
-        // Vector from player to enemy
-        const toEnemyX = enemy.x - player.x;
-        const toEnemyY = enemy.y - player.y;
-        
-        // Project enemy position onto laser direction
-        const projection = toEnemyX * dirX + toEnemyY * dirY;
-        
-        // Enemy must be in front of player
-        if (projection < 0) continue;
-        
-        // Find closest point on laser line to enemy
-        const closestX = player.x + dirX * projection;
-        const closestY = player.y + dirY * projection;
-        
-        // Distance from enemy to closest point on line
-        const distX = enemy.x - closestX;
-        const distY = enemy.y - closestY;
-        const distance = Math.sqrt(distX * distX + distY * distY);
-        
-        // Check if laser passes through enemy (within radius)
-        if (distance <= enemy.radius) {
-          hitEnemies.push(enemy);
-        }
-      }
-      
-      // Apply damage to hit enemies
-      for (const enemy of hitEnemies) {
-        const killed = enemy.hit(player.weapon.damage);
-        
-        if (killed) {
-          soundManager.play('enemyDeath');
-          soundManager.play('scorePoint');
-          game.kills++;
-          game.score += enemy.scoreValue;
-          enemiesRef.current = enemiesRef.current.filter(e => e !== enemy);
-          
-          bloodSplattersRef.current.push(new BloodSplatter(enemy.x, enemy.y));
-          
-          for (let k = 0; k < 15; k++) {
-            particlesRef.current.push(new Particle(enemy.x, enemy.y, '#8b0000'));
-          }
-          
-          showFloatingText(enemy.x, enemy.y, `+${enemy.scoreValue}`, '#ffff00');
-        } else {
-          soundManager.play('enemyHit');
-          // Ricochet effect on hit
-          const hitAngle = Math.atan2(enemy.y - player.y, enemy.x - player.x);
-          ricochetEffectsRef.current.push(new RicochetEffect(enemy.x, enemy.y, hitAngle + Math.PI));
-        }
-        
-        pierceCount--;
-        if (pierceCount < 0) break;
-      }
-      
-    updateHUD();
-
-    soundManager.play('shoot');
-
-    // Visual laser effect
-    const laserLength = 1000;
-    const laserEndX = player.x + Math.cos(angle) * laserLength;
-    const laserEndY = player.y + Math.sin(angle) * laserLength;
-    
-    // Store laser for rendering
-    if (!game.lasers) game.lasers = [];
-    game.lasers.push({
-      startX: player.x,
-      startY: player.y,
-      endX: laserEndX,
-      endY: laserEndY,
-      alpha: 1,
-      createdAt: now
-    });
-
-    // Muzzle flash particles
-    for (let i = 0; i < 3; i++) {
-      particlesRef.current.push(
-        new Particle(player.x + Math.cos(angle) * 20, player.y + Math.sin(angle) * 20, '#ffaa00')
-      );
-    }
-
-    updateHUD();
+    const e = engineRef.current;
+    if (!e) return;
+    const diffKey = game.difficulty === 'challenge' ? 'normal' : game.difficulty;
+    const diff = DIFFICULTY[diffKey];
+    const mults = computeChallengeMults();
+    e.set_player_stats(
+      diff.playerHealth,
+      diff.playerSpeed * mults.playerSpeedMult,
+      diff.dashCooldown,
+      diff.fireRate,
+      diff.playerDamage * mults.playerDamageMult,
+      0, // piercing reset
+    );
   };
 
-  const performDash = () => {
-    const player = playerRef.current;
+  const recomputePlayerStatsFromUpgrades = () => {
+    // After applying an upgrade we re-derive the full stat block from the
+    // base difficulty + upgrade levels and push to the engine.
     const game = gameRef.current;
+    const e = engineRef.current;
+    if (!e) return;
+    const diffKey = game.difficulty === 'challenge' ? 'normal' : game.difficulty;
+    const diff = DIFFICULTY[diffKey];
+    const mults = computeChallengeMults();
+    const u = game.upgrades;
+    const lvl = (k) => u[k] || 0;
 
-    if (
-      (game.state === 'playing' || game.state === 'tutorial') &&
-      player.dashEnergy >= 50 &&
-      !player.isDashing
-    ) {
-      player.isDashing = true;
-      player.dashEnergy = Math.max(0, player.dashEnergy - 50);
-      player.dashCooldown = player.maxDashCooldown;
+    const maxHp = 100 + lvl('maxHealth') * 20;
+    const speed = 5 + lvl('speed') * 0.5;
+    const dashCd = Math.max(1500, 4000 - lvl('dashCooldown') * 500);
+    const fireRate = Math.max(100, 300 - lvl('fireRate') * 40);
+    const damage = (50 + lvl('damage') * 15) * mults.playerDamageMult;
+    const piercing = lvl('piercing');
 
-      soundManager.play('dash');
-
-      for (let i = 0; i < 20; i++) {
-        particlesRef.current.push(new Particle(player.x, player.y, '#4a90e2'));
-      }
-
-      setTimeout(() => {
-        player.isDashing = false;
-      }, player.dashDuration);
-
-      updateHUD();
-      return true;
-    }
-    return false;
+    // For non-default difficulties, blend in difficulty base where no upgrade
+    // has been taken. Mirrors the JS upgrade.effect closures.
+    e.set_player_stats(
+      Math.max(maxHp, diff.playerHealth),
+      Math.max(speed, diff.playerSpeed * mults.playerSpeedMult),
+      Math.min(dashCd, diff.dashCooldown),
+      Math.min(fireRate, diff.fireRate),
+      Math.max(damage, diff.playerDamage * mults.playerDamageMult),
+      piercing,
+    );
   };
 
-  const gameOver = () => {
-    const game = gameRef.current;
-    game.state = 'gameOver';
-    setGameState('gameOver');
-    soundManager.play('gameOver');
-    soundManager.stopMusic();
-  };
-
-  const showUpgradeScreen = () => {
-    const player = playerRef.current;
-    const upgrades = getRandomUpgrades(player.upgrades, 3);
-    setUpgradeOptions(upgrades);
-    setGameState('upgrade');
-  };
-
-  const selectUpgrade = (upgradeKey) => {
-    const player = playerRef.current;
-    const game = gameRef.current;
-
-    // Apply upgrade
-    applyUpgrade(player, player.upgrades, upgradeKey);
-    setGameState('playing');
-    game.state = 'playing';
-
-    setTimeout(() => {
-      game.wave++;
-      updateHUD();
-      spawnWave();
-    }, 500);
-  };
-
+  // ── Lifecycle ────────────────────────────────────────────────────────
   const initGame = () => {
+    const e = engineRef.current;
     const game = gameRef.current;
-    const player = playerRef.current;
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!e || !canvas) return;
 
     game.state = 'playing';
     game.wave = 1;
@@ -399,38 +257,12 @@ export function useGameLoop(canvasRef) {
     game.waitingForNextWave = false;
     game.expectedEnemies = 0;
     game.spawnedEnemies = 0;
+    game.upgrades = {};
+    game.lasers = [];
 
-    const diff = game.difficulty === 'challenge' ? DIFFICULTY.normal : DIFFICULTY[game.difficulty];
-    
-    // Apply challenge player modifiers
-    let speedMult = 1.0;
-    let damageMult = 1.0;
-    
-    if (game.challengeData && game.challengeData.modifiers) {
-      game.challengeData.modifiers.forEach(mod => {
-        if (mod.effect.playerSpeedMultiplier) speedMult *= mod.effect.playerSpeedMultiplier;
-        if (mod.effect.playerDamageMultiplier) damageMult *= mod.effect.playerDamageMultiplier;
-      });
-    }
-    
-    player.health = diff.playerHealth;
-    player.maxHealth = diff.playerHealth;
-    player.speed = diff.playerSpeed * speedMult;
-    player.weapon.damage = diff.playerDamage * damageMult;
-    player.weapon.fireRate = diff.fireRate;
-    player.maxDashCooldown = diff.dashCooldown;
-    player.weapon.piercing = 0;
-    player.dashCooldown = 0;
-    player.isDashing = false;
-    player.dashEnergy = player.maxDashEnergy;
-    player.x = canvas.width / 2;
-    player.y = canvas.height / 2;
-
-    bulletsRef.current.length = 0;
-    enemiesRef.current.length = 0;
-    particlesRef.current.length = 0;
-    bloodSplattersRef.current.length = 0;
-    floatingTextsRef.current.length = 0;
+    e.set_canvas_size(canvas.width, canvas.height);
+    applyDifficultyToEngine();
+    e.reset_world();
 
     updateHUD();
     spawnWave();
@@ -438,9 +270,8 @@ export function useGameLoop(canvasRef) {
 
   const startGame = (selectedDifficulty, challengeData = null) => {
     const game = gameRef.current;
-
     soundManager.play('uiClick');
-    
+
     if (challengeData) {
       game.difficulty = 'challenge';
       game.challengeData = challengeData;
@@ -448,8 +279,8 @@ export function useGameLoop(canvasRef) {
       setDifficultyBadge(`📅 ${challengeData.name.toUpperCase()}`);
     } else {
       game.difficulty = selectedDifficulty;
+      game.challengeData = null;
       setDifficulty(selectedDifficulty);
-
       const badges = {
         easy: '😊 EASY MODE',
         normal: '😐 NORMAL MODE',
@@ -465,11 +296,8 @@ export function useGameLoop(canvasRef) {
     soundManager.playMusic();
   };
 
-
-
   const startTutorialMode = () => {
     const game = gameRef.current;
-
     soundManager.play('uiClick');
     game.state = 'tutorial';
     game.difficulty = 'tutorial';
@@ -477,7 +305,6 @@ export function useGameLoop(canvasRef) {
     setGameState('tutorial');
     setDifficulty('tutorial');
     setDifficultyBadge('📚 TUTORIAL');
-
     initGame();
     soundManager.playMusic();
     setTutorialText(tutorialSteps[0].text);
@@ -485,11 +312,9 @@ export function useGameLoop(canvasRef) {
 
   const continTutorial = () => {
     const game = gameRef.current;
-    const player = playerRef.current;
-
+    const e = engineRef.current;
     soundManager.play('uiClick');
     game.tutorialStep++;
-
     if (game.tutorialStep >= tutorialSteps.length) {
       setGameState('playing');
       game.state = 'playing';
@@ -499,21 +324,60 @@ export function useGameLoop(canvasRef) {
       game.waitingForNextWave = false;
       setDifficulty('easy');
       setDifficultyBadge('😊 EASY MODE');
-
       const diff = DIFFICULTY['easy'];
-      player.maxHealth = diff.playerHealth;
-      player.health = diff.playerHealth;
-      player.speed = diff.playerSpeed;
-      player.weapon.fireRate = diff.fireRate;
-      player.maxDashCooldown = diff.dashCooldown;
-
+      e.set_player_stats(diff.playerHealth, diff.playerSpeed,
+        diff.dashCooldown, diff.fireRate, diff.playerDamage, 0);
       updateHUD();
       spawnWave();
       return;
     }
+    setTutorialText(tutorialSteps[game.tutorialStep].text);
+  };
 
-    const step = tutorialSteps[game.tutorialStep];
-    setTutorialText(step.text);
+  const showUpgradeScreen = () => {
+    const game = gameRef.current;
+    const upgrades = getRandomUpgrades(game.upgrades, 3);
+    setUpgradeOptions(upgrades);
+    setGameState('upgrade');
+  };
+
+  const selectUpgrade = (upgradeKey) => {
+    const game = gameRef.current;
+    // Track upgrade level via plain object (so existing UI components keep working)
+    const fakePlayer = {
+      maxHealth: 100, health: 100,
+      speed: 5,
+      weapon: { damage: 50, fireRate: 300, piercing: 0 },
+      maxDashCooldown: 4000,
+      upgrades: game.upgrades,
+    };
+    applyUpgrade(fakePlayer, game.upgrades, upgradeKey);
+    recomputePlayerStatsFromUpgrades();
+    // Vitality also grants instant heal
+    if (upgradeKey === 'maxHealth') {
+      const e = engineRef.current;
+      e.add_max_health(fakePlayer.maxHealth, 20);
+    }
+
+    setGameState('playing');
+    game.state = 'playing';
+    setTimeout(() => {
+      game.wave++;
+      updateHUD();
+      spawnWave();
+    }, 500);
+  };
+
+  const performDash = () => {
+    const game = gameRef.current;
+    const e = engineRef.current;
+    if (!e || (game.state !== 'playing' && game.state !== 'tutorial')) return false;
+    if (e.try_dash()) {
+      soundManager.play('dash');
+      setTimeout(() => e.end_dash(), 200);
+      return true;
+    }
+    return false;
   };
 
   const restartGame = () => {
@@ -522,304 +386,347 @@ export function useGameLoop(canvasRef) {
     gameRef.current.state = 'start';
     setIsPaused(false);
     gameRef.current.paused = false;
+    const e = engineRef.current;
+    if (e) e.clear_enemies();
   };
 
   const togglePause = () => {
     const game = gameRef.current;
-
-    if (game.state !== 'playing' && game.state !== 'tutorial') {
-      return;
-    }
-
+    if (game.state !== 'playing' && game.state !== 'tutorial') return;
     game.paused = !game.paused;
     setIsPaused(game.paused);
     soundManager.play('uiClick');
-
-    if (game.paused) {
-      soundManager.stopMusic();
-    } else {
-      soundManager.playMusic();
-    }
+    if (game.paused) soundManager.stopMusic(); else soundManager.playMusic();
   };
 
-  // Throttle HUD updates to every 3 frames for performance
-  let hudFrameCounter = 0;
-  const throttledUpdateHUD = () => {
-    hudFrameCounter++;
-    if (hudFrameCounter % 3 === 0) updateHUD();
-  };
-
-  const update = () => {
+  const gameOver = () => {
     const game = gameRef.current;
-    const player = playerRef.current;
+    game.state = 'gameOver';
+    setGameState('gameOver');
+    soundManager.play('gameOver');
+    soundManager.stopMusic();
+  };
+
+  // ── Per-frame update via WASM ────────────────────────────────────────
+  const stepFrame = (dtMs) => {
+    const game = gameRef.current;
     const canvas = canvasRef.current;
+    const e = engineRef.current;
     const mouse = mouseRef.current;
     const keys = keysRef.current;
+    if (!canvas || !e) return;
+    if ((game.state !== 'playing' && game.state !== 'tutorial') || game.paused) return;
 
-    if (!canvas || (game.state !== 'playing' && game.state !== 'tutorial') || game.paused) return;
+    // Input vector
+    const joy = window.joystickInput || { x: 0, y: 0 };
+    let mx = (keys['d'] || keys['D'] || keys['arrowright'] ? 1 : 0)
+           - (keys['a'] || keys['A'] || keys['arrowleft']  ? 1 : 0);
+    let my = (keys['s'] || keys['S'] || keys['arrowdown']  ? 1 : 0)
+           - (keys['w'] || keys['W'] || keys['arrowup']    ? 1 : 0);
+    if (Math.abs(joy.x) > 0.2 || Math.abs(joy.y) > 0.2) { mx = joy.x; my = joy.y; }
 
-    if (player.dashCooldown > 0) {
-      player.dashCooldown = Math.max(0, player.dashCooldown - 16);
+    // Step engine
+    const ev = e.step(dtMs, mx, my, mouse.x, mouse.y);
+    const bits = ev.bits;
+    const shake = ev.shake;
+    ev.free();
+
+    if (bits & EV_PLAYER_HURT) {
+      soundManager.play('playerHurt');
+      if (shake > 0) {
+        canvas.style.transform = `translate(${(Math.random() * 2 - 1) * shake}px, ${(Math.random() * 2 - 1) * shake}px)`;
+        setTimeout(() => { canvas.style.transform = ''; }, 60);
+      }
+    }
+    if (bits & EV_GAME_OVER) {
+      gameOver();
+      return;
     }
 
-    if (player.dashEnergy < player.maxDashEnergy) {
-      player.dashEnergy = Math.min(
-        player.maxDashEnergy,
-        player.dashEnergy + player.dashEnergyRegen
-      );
+    // Shoot
+    if (mouse.down || window.mobileFireActive) {
+      const r = e.fire_hitscan();
+      if (r !== 0xFFFFFFFF) {
+        // Fired this frame
+        if (r > 0) {
+          // Process per-hit results (sounds, ricochets, score)
+          const playerX = e.player_x(), playerY = e.player_y();
+          const angle = e.player_angle();
+          let killCount = 0, scoreSum = 0;
+          for (let i = 0; i < r; i++) {
+            const killed = e.hit_killed(i);
+            if (killed) {
+              killCount++;
+              scoreSum += e.hit_score(i);
+              soundManager.play('enemyDeath');
+              soundManager.play('scorePoint');
+            } else {
+              soundManager.play('enemyHit');
+              ricochetEffectsRef.current.push(
+                new RicochetEffect(e.hit_x(i), e.hit_y(i), e.hit_angle(i))
+              );
+            }
+          }
+          if (killCount > 0) {
+            game.kills += killCount;
+            game.score += scoreSum;
+          }
+        }
+        soundManager.play('shoot');
+        // Visual laser
+        const playerX = e.player_x(), playerY = e.player_y();
+        const angle = e.player_angle();
+        const len = 1000;
+        game.lasers.push({
+          startX: playerX, startY: playerY,
+          endX: playerX + Math.cos(angle) * len,
+          endY: playerY + Math.sin(angle) * len,
+          alpha: 1, createdAt: performance.now(),
+        });
+      }
+    }
+
+    // Update visual-only ricochets
+    const rico = ricochetEffectsRef.current;
+    if (rico.length > 20) rico.splice(0, rico.length - 20);
+    for (let i = rico.length - 1; i >= 0; i--) {
+      if (!rico[i].update()) rico.splice(i, 1);
     }
 
     throttledUpdateHUD();
 
-    const joystickInput = window.joystickInput || { x: 0, y: 0 };
-
-    let moveX =
-      (keys['d'] || keys['D'] || keys['arrowright'] ? 1 : 0) -
-      (keys['a'] || keys['A'] || keys['arrowleft'] ? 1 : 0);
-    let moveY =
-      (keys['s'] || keys['S'] || keys['arrowdown'] ? 1 : 0) -
-      (keys['w'] || keys['W'] || keys['arrowup'] ? 1 : 0);
-
-    if (Math.abs(joystickInput.x) > 0.2 || Math.abs(joystickInput.y) > 0.2) {
-      moveX = joystickInput.x;
-      moveY = joystickInput.y;
-    }
-
-    if (moveX !== 0 || moveY !== 0) {
-      const length = Math.sqrt(moveX * moveX + moveY * moveY);
-      const currentSpeed = player.isDashing ? player.dashSpeed : player.speed;
-      player.x += (moveX / length) * currentSpeed;
-      player.y += (moveY / length) * currentSpeed;
-
-      if (player.isDashing) {
-        particlesRef.current.push(new Particle(player.x, player.y, '#4a90e2'));
-      }
-
-      const margin = player.size / 2 + 5;
-      player.x = Math.max(margin, Math.min(canvas.width - margin, player.x));
-      player.y = Math.max(margin, Math.min(canvas.height - margin, player.y));
-    }
-
-    player.angle = Math.atan2(mouse.y - player.y, mouse.x - player.x);
-
-    if (mouse.down || window.mobileFireActive) {
-      shoot();
-    }
-
-    const enemies = enemiesRef.current;
-    const particles = particlesRef.current;
-    const bloodSplatters = bloodSplattersRef.current;
-    const floatingTexts = floatingTextsRef.current;
-
-    for (let i = enemies.length - 1; i >= 0; i--) {
-      if (enemies[i]) {
-        enemies[i].update(canvas, updateHUD, gameOver);
-      }
-    }
-
-    // Cap particle arrays for performance
-    if (particles.length > 200) particles.splice(0, particles.length - 200);
-    if (bloodSplatters.length > 30) bloodSplatters.splice(0, bloodSplatters.length - 30);
-
-    for (let i = particles.length - 1; i >= 0; i--) {
-      if (!particles[i].update()) particles.splice(i, 1);
-    }
-
-    for (let i = bloodSplatters.length - 1; i >= 0; i--) {
-      if (!bloodSplatters[i].update()) bloodSplatters.splice(i, 1);
-    }
-
-    for (let i = floatingTexts.length - 1; i >= 0; i--) {
-      if (!floatingTexts[i].update()) floatingTexts.splice(i, 1);
-    }
-
-    const hitMarkers = hitMarkersRef.current;
-    for (let i = hitMarkers.length - 1; i >= 0; i--) {
-      if (!hitMarkers[i].update()) hitMarkers.splice(i, 1);
-    }
-
-    const damageNumbers = damageNumbersRef.current;
-    for (let i = damageNumbers.length - 1; i >= 0; i--) {
-      if (!damageNumbers[i].update()) damageNumbers.splice(i, 1);
-    }
-
-    const hitEffects = hitEffectsRef.current;
-    for (let i = hitEffects.length - 1; i >= 0; i--) {
-      if (!hitEffects[i].update()) hitEffects.splice(i, 1);
-    }
-
-    // Update ricochet effects
-    const ricochets = ricochetEffectsRef.current;
-    if (ricochets.length > 20) ricochets.splice(0, ricochets.length - 20);
-    for (let i = ricochets.length - 1; i >= 0; i--) {
-      if (!ricochets[i].update()) ricochets.splice(i, 1);
-    }
-
-    // Wave completion logic
-    const allEnemiesSpawned = game.spawnedEnemies >= game.expectedEnemies;
-    if (
-      enemies.length === 0 &&
-      game.waveInProgress &&
-      !game.waitingForNextWave &&
-      allEnemiesSpawned &&
-      (game.state === 'playing' || game.state === 'tutorial')
-    ) {
-        game.waveInProgress = false;
-        game.waitingForNextWave = true;
-
-        player.health = player.maxHealth;
+    // Wave completion
+    const allSpawned = game.spawnedEnemies >= game.expectedEnemies;
+    if (e.enemies_len() === 0 && game.waveInProgress
+        && !game.waitingForNextWave && allSpawned) {
+      game.waveInProgress = false;
+      game.waitingForNextWave = true;
+      e.heal_full();
+      updateHUD();
+      soundManager.play('waveComplete');
+      const diffKey = game.difficulty === 'challenge' ? 'normal' : game.difficulty;
+      const bonus = 50 * DIFFICULTY[diffKey].scoreMultiplier;
+      if (bonus > 0) {
+        game.score += bonus;
         updateHUD();
-
-        soundManager.play('waveComplete');
-        
-        const diff = game.difficulty === 'challenge' ? DIFFICULTY.normal : DIFFICULTY[game.difficulty];
-        const bonus = 50 * diff.scoreMultiplier;
-        
-        if (bonus > 0) {
-          game.score += bonus;
-          updateHUD();
-          showFloatingText(
-            canvas.width / 2,
-            canvas.height / 2,
-            `Wave Complete! +${bonus}`,
-            '#4CAF50'
-          );
-        } else {
-          showFloatingText(canvas.width / 2, canvas.height / 2, `Wave Complete!`, '#4CAF50');
-        }
-
-        if (game.wave % 3 === 0 && game.state === 'playing') {
-          showUpgradeScreen();
-        } else {
-          setTimeout(() => {
-            if ((game.state === 'playing' || game.state === 'tutorial') && game.waitingForNextWave) {
-              game.wave++;
-              game.waitingForNextWave = false;
-              updateHUD();
-
-              if (game.state === 'tutorial') {
-                continTutorial();
-              } else {
-                spawnWave();
-              }
-            }
-          }, 2000);
-        }
+        e.add_floating_text(canvas.width / 2, canvas.height / 2,
+          `Wave Complete! +${bonus}`, '#4CAF50');
+      } else {
+        e.add_floating_text(canvas.width / 2, canvas.height / 2,
+          'Wave Complete!', '#4CAF50');
       }
+      if (game.wave % 3 === 0 && game.state === 'playing') {
+        showUpgradeScreen();
+      } else {
+        setTimeout(() => {
+          if ((game.state === 'playing' || game.state === 'tutorial') && game.waitingForNextWave) {
+            game.wave++;
+            game.waitingForNextWave = false;
+            updateHUD();
+            if (game.state === 'tutorial') continTutorial(); else spawnWave();
+          }
+        }, 2000);
+      }
+    }
   };
 
+  // ── Drawing — reads from WASM memory ────────────────────────────────
   const draw = () => {
     const game = gameRef.current;
-    const player = playerRef.current;
     const canvas = canvasRef.current;
-    const mouse = mouseRef.current;
-
-    if (!canvas) return;
-
+    const e = engineRef.current;
+    const mem = memRef.current;
+    if (!canvas || !e || !mem) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (game.state !== 'playing' && game.state !== 'tutorial') return;
 
-    if (game.state === 'playing' || game.state === 'tutorial') {
-      // Draw aim line
+    e.build_render_buffers();
+
+    const playerX = e.player_x();
+    const playerY = e.player_y();
+    const playerSize = e.player_size();
+    const playerAngle = e.player_angle();
+    const playerDashing = e.player_is_dashing();
+    const mouse = mouseRef.current;
+
+    // Aim line
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([5, 5]);
+    ctx.beginPath();
+    ctx.moveTo(playerX, playerY);
+    ctx.lineTo(mouse.x, mouse.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+
+    // Player
+    drawPlayer(ctx, playerX, playerY, playerSize, playerAngle, playerDashing);
+
+    // Blood splatters first (behind enemies)
+    const bloodLen = e.blood_len();
+    if (bloodLen > 0) {
+      const bloodView = new Float32Array(mem.buffer, e.blood_ptr(), bloodLen * 4);
       ctx.save();
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-      ctx.lineWidth = 1;
-      ctx.setLineDash([5, 5]);
-      ctx.beginPath();
-      ctx.moveTo(player.x, player.y);
-      ctx.lineTo(mouse.x, mouse.y);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.restore();
-
-      // Draw local player using SVG character
-      drawPlayer(ctx, player.x, player.y, player.size, player.angle, player.isDashing);
-
-      // Draw enemies
-      enemiesRef.current.forEach((enemy) => enemy.draw(ctx));
-
-      // Draw lasers
-      if (game.lasers) {
-        const now = Date.now();
-        game.lasers = game.lasers.filter(laser => {
-          const age = now - laser.createdAt;
-          if (age > 100) return false;
-          
-          laser.alpha = 1 - (age / 100);
-          
-          ctx.save();
-          ctx.globalAlpha = laser.alpha;
-          ctx.strokeStyle = '#ffff00';
-          ctx.lineWidth = 3;
-          ctx.shadowBlur = 10;
-          ctx.shadowColor = '#ffff00';
-          ctx.beginPath();
-          ctx.moveTo(laser.startX, laser.startY);
-          ctx.lineTo(laser.endX, laser.endY);
-          ctx.stroke();
-          ctx.restore();
-          
-          return true;
-        });
+      ctx.fillStyle = '#8b0000';
+      for (let i = 0; i < bloodLen; i++) {
+        const o = i * 4;
+        const x = bloodView[o], y = bloodView[o + 1],
+              r = bloodView[o + 2], a = bloodView[o + 3];
+        ctx.globalAlpha = a;
+        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
       }
-
-      // Draw particles and effects
-      particlesRef.current.forEach((particle) => particle.draw(ctx));
-      bloodSplattersRef.current.forEach((splatter) => splatter.draw(ctx));
-      floatingTextsRef.current.forEach((text) => text.draw(ctx));
-
-      // Draw visual effects
-      hitMarkersRef.current.forEach((marker) => marker.draw(ctx));
-      damageNumbersRef.current.forEach((number) => number.draw(ctx));
-      hitEffectsRef.current.forEach((effect) => effect.draw(ctx));
-
-      // Draw ricochet effects
-      ricochetEffectsRef.current.forEach((ricochet) => ricochet.draw(ctx));
+      ctx.globalAlpha = 1;
+      ctx.restore();
     }
+
+    // Enemies
+    const enemyLen = e.enemies_len();
+    if (enemyLen > 0) {
+      const stride = e.enemy_stride();
+      const view = new Float32Array(mem.buffer, e.enemies_ptr(), enemyLen * stride);
+      for (let i = 0; i < enemyLen; i++) {
+        const o = i * stride;
+        const x = view[o], y = view[o + 1], radius = view[o + 2], size = view[o + 3];
+        const hp = view[o + 4], maxHp = view[o + 5];
+        const isBoss = view[o + 6] > 0.5;
+        const facingLeft = view[o + 7] > 0.5;
+        const isCharging = view[o + 8] > 0.5;
+        if (isBoss) {
+          drawBossVampire(ctx, x, y, size, facingLeft, hp / maxHp, performance.now());
+          // Boss bar
+          const bw = 80, bh = 8;
+          ctx.fillStyle = 'rgba(50,0,0,0.9)';
+          ctx.fillRect(x - bw / 2, y - size / 2 - 25, bw, bh);
+          const pct = hp / maxHp;
+          ctx.fillStyle = pct > 0.66 ? '#c41e3a' : pct > 0.33 ? '#ff6600' : '#ff0000';
+          ctx.fillRect(x - bw / 2, y - size / 2 - 25, pct * bw, bh);
+          ctx.strokeStyle = '#ffcc00'; ctx.lineWidth = 2;
+          ctx.strokeRect(x - bw / 2, y - size / 2 - 25, bw, bh);
+          ctx.fillStyle = '#ffcc00';
+          ctx.font = 'bold 12px Arial'; ctx.textAlign = 'center';
+          ctx.fillText('⚔ BOSS ⚔', x, y - size / 2 - 30);
+          if (isCharging) {
+            ctx.strokeStyle = 'rgba(255,0,0,0.6)';
+            ctx.lineWidth = 3; ctx.setLineDash([5, 5]);
+            ctx.beginPath(); ctx.arc(x, y, radius + 10, 0, Math.PI * 2); ctx.stroke();
+            ctx.setLineDash([]);
+          }
+        } else {
+          drawVampire(ctx, x, y, size, facingLeft, hp / maxHp);
+          if (hp < maxHp) {
+            const bw = 50, bh = 6;
+            const bx = x - bw / 2, by = y - size / 2 - 15;
+            ctx.fillStyle = 'rgba(50,0,0,0.8)';
+            ctx.fillRect(bx, by, bw, bh);
+            ctx.fillStyle = '#c41e3a';
+            ctx.fillRect(bx, by, (hp / maxHp) * bw, bh);
+            ctx.strokeStyle = '#000'; ctx.lineWidth = 1;
+            ctx.strokeRect(bx, by, bw, bh);
+          }
+        }
+      }
+    }
+
+    // Lasers
+    if (game.lasers && game.lasers.length) {
+      const now = performance.now();
+      game.lasers = game.lasers.filter(l => {
+        const age = now - l.createdAt;
+        if (age > 100) return false;
+        l.alpha = 1 - age / 100;
+        ctx.save();
+        ctx.globalAlpha = l.alpha;
+        ctx.strokeStyle = '#ffff00';
+        ctx.lineWidth = 3;
+        ctx.shadowBlur = 10; ctx.shadowColor = '#ffff00';
+        ctx.beginPath();
+        ctx.moveTo(l.startX, l.startY); ctx.lineTo(l.endX, l.endY);
+        ctx.stroke();
+        ctx.restore();
+        return true;
+      });
+    }
+
+    // Particles
+    const partLen = e.particles_len();
+    if (partLen > 0) {
+      const stride = e.particle_stride();
+      const view = new Float32Array(mem.buffer, e.particles_ptr(), partLen * stride);
+      ctx.save();
+      for (let i = 0; i < partLen; i++) {
+        const o = i * stride;
+        const x = view[o], y = view[o + 1], r = view[o + 2], a = view[o + 3];
+        const cr = view[o + 4], cg = view[o + 5], cb = view[o + 6];
+        ctx.globalAlpha = Math.max(0, a);
+        ctx.fillStyle = `rgb(${(cr * 255) | 0},${(cg * 255) | 0},${(cb * 255) | 0})`;
+        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+
+    // Floating texts
+    const tcount = e.texts_count();
+    if (tcount > 0) {
+      ctx.save();
+      ctx.font = 'bold 24px Arial'; ctx.textAlign = 'center';
+      ctx.lineWidth = 3; ctx.strokeStyle = '#000';
+      for (let i = 0; i < tcount; i++) {
+        const a = e.text_alpha(i);
+        const x = e.text_x(i), y = e.text_y(i);
+        const text = e.text_str(i);
+        const color = e.text_color(i);
+        ctx.globalAlpha = Math.max(0, a);
+        ctx.fillStyle = color;
+        ctx.strokeText(text, x, y);
+        ctx.fillText(text, x, y);
+      }
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+
+    // Ricochets (JS-side visual)
+    ricochetEffectsRef.current.forEach(r => r.draw(ctx));
   };
 
+  // ── RAF loop ─────────────────────────────────────────────────────────
   useEffect(() => {
-    let animationId;
-
-    const gameLoop = () => {
-      update();
-      draw();
-      animationId = requestAnimationFrame(gameLoop);
-    };
-
-    gameLoop();
-
-    return () => {
-      if (animationId) {
-        cancelAnimationFrame(animationId);
+    let raf;
+    let last = performance.now();
+    const loop = (now) => {
+      const dt = Math.min(now - last, 50);
+      last = now;
+      if (readyRef.current) {
+        stepFrame(dt);
+        draw();
       }
+      raf = requestAnimationFrame(loop);
     };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
   }, []);
 
+  // ── Canvas resize ────────────────────────────────────────────────────
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
-    const resizeCanvas = () => {
+    const resize = () => {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
-
-      const player = playerRef.current;
-      if (player.x && player.y) {
-        const margin = player.size / 2 + 5;
-        player.x = Math.max(margin, Math.min(canvas.width - margin, player.x));
-        player.y = Math.max(margin, Math.min(canvas.height - margin, player.y));
-      }
+      const e = engineRef.current;
+      if (e) e.set_canvas_size(canvas.width, canvas.height);
     };
-
-    resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
-
-    return () => window.removeEventListener('resize', resizeCanvas);
+    resize();
+    window.addEventListener('resize', resize);
+    return () => window.removeEventListener('resize', resize);
   }, []);
 
+  // ── Input listeners ──────────────────────────────────────────────────
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -827,100 +734,51 @@ export function useGameLoop(canvasRef) {
     const handleKeyDown = (e) => {
       keysRef.current[e.key] = true;
       keysRef.current[e.key.toLowerCase()] = true;
-
-      setWasdKeys((prev) => new Set([...prev, e.code]));
-
-      if (e.ctrlKey && e.key === 'l') {
-        e.preventDefault();
-      }
-
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        togglePause();
-        return;
-      }
-
+      setWasdKeys(prev => new Set([...prev, e.code]));
+      if (e.ctrlKey && e.key === 'l') e.preventDefault();
+      if (e.key === 'Escape') { e.preventDefault(); togglePause(); return; }
       if (e.key === ' ' || e.code === 'Space') {
-        if (performDash()) {
-          e.preventDefault();
-        }
+        if (performDash()) e.preventDefault();
       }
     };
-
     const handleKeyUp = (e) => {
       keysRef.current[e.key] = false;
       keysRef.current[e.key.toLowerCase()] = false;
-      setWasdKeys((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(e.code);
-        return newSet;
-      });
+      setWasdKeys(prev => { const n = new Set(prev); n.delete(e.code); return n; });
     };
-
     const handleMouseMove = (e) => {
       const rect = canvas.getBoundingClientRect();
       mouseRef.current.x = e.clientX - rect.left;
       mouseRef.current.y = e.clientY - rect.top;
-
-      const crosshair = document.getElementById('crosshair');
-      if (crosshair) {
-        crosshair.style.left = e.clientX + 'px';
-        crosshair.style.top = e.clientY + 'px';
-      }
+      const ch = document.getElementById('crosshair');
+      if (ch) { ch.style.left = e.clientX + 'px'; ch.style.top = e.clientY + 'px'; }
     };
-
-    const handleMouseDown = () => {
-      mouseRef.current.down = true;
-    };
-
-    const handleMouseUp = () => {
-      mouseRef.current.down = false;
-    };
-
-    const handleTouchStart = (e) => {
-      const touch = e.touches[0];
-      const joystickContainer = document.getElementById('joystick-container');
-      const dashButton = document.getElementById('mobile-dash');
-
-      if (joystickContainer && dashButton) {
-        const joystickRect = joystickContainer.getBoundingClientRect();
-        const dashRect = dashButton.getBoundingClientRect();
-
-        const touchX = touch.clientX;
-        const touchY = touch.clientY;
-
-        const isOnJoystick =
-          touchX >= joystickRect.left &&
-          touchX <= joystickRect.right &&
-          touchY >= joystickRect.top &&
-          touchY <= joystickRect.bottom;
-        const isOnDash =
-          touchX >= dashRect.left &&
-          touchX <= dashRect.right &&
-          touchY >= dashRect.top &&
-          touchY <= dashRect.bottom;
-
-        if (!isOnJoystick && !isOnDash) {
+    const handleMouseDown = () => { mouseRef.current.down = true; };
+    const handleMouseUp = () => { mouseRef.current.down = false; };
+    const handleTouchStart = (ev) => {
+      const t = ev.touches[0];
+      const j = document.getElementById('joystick-container');
+      const d = document.getElementById('mobile-dash');
+      if (j && d) {
+        const jr = j.getBoundingClientRect(), dr = d.getBoundingClientRect();
+        const tx = t.clientX, ty = t.clientY;
+        const onJoy = tx >= jr.left && tx <= jr.right && ty >= jr.top && ty <= jr.bottom;
+        const onDash = tx >= dr.left && tx <= dr.right && ty >= dr.top && ty <= dr.bottom;
+        if (!onJoy && !onDash) {
           const rect = canvas.getBoundingClientRect();
-          mouseRef.current.x = touch.clientX - rect.left;
-          mouseRef.current.y = touch.clientY - rect.top;
+          mouseRef.current.x = t.clientX - rect.left;
+          mouseRef.current.y = t.clientY - rect.top;
           mouseRef.current.down = true;
         }
       }
     };
-
-    const handleTouchMove = (e) => {
-      const touch = e.touches[0];
+    const handleTouchMove = (ev) => {
+      const t = ev.touches[0];
       const rect = canvas.getBoundingClientRect();
-      mouseRef.current.x = touch.clientX - rect.left;
-      mouseRef.current.y = touch.clientY - rect.top;
+      mouseRef.current.x = t.clientX - rect.left;
+      mouseRef.current.y = t.clientY - rect.top;
     };
-
-    const handleTouchEnd = (e) => {
-      if (e.touches.length === 0) {
-        mouseRef.current.down = false;
-      }
-    };
+    const handleTouchEnd = (ev) => { if (ev.touches.length === 0) mouseRef.current.down = false; };
 
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
@@ -930,7 +788,6 @@ export function useGameLoop(canvasRef) {
     canvas.addEventListener('touchstart', handleTouchStart);
     canvas.addEventListener('touchmove', handleTouchMove);
     canvas.addEventListener('touchend', handleTouchEnd);
-
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
@@ -944,20 +801,9 @@ export function useGameLoop(canvasRef) {
   }, []);
 
   return {
-    gameState,
-    hudData,
-    difficulty,
-    difficultyBadge,
-    upgradeOptions,
-    tutorialText,
-    wasdKeys,
-    isPaused,
-    startGame,
-    startTutorialMode,
-    continTutorial,
-    restartGame,
-    selectUpgrade,
-    performDash,
-    togglePause,
+    gameState, hudData, difficulty, difficultyBadge,
+    upgradeOptions, tutorialText, wasdKeys, isPaused,
+    startGame, startTutorialMode, continTutorial, restartGame,
+    selectUpgrade, performDash, togglePause,
   };
 }
