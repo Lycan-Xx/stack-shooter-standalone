@@ -635,13 +635,7 @@ fn conf() -> macroquad::window::Conf {
         window_height:  600,
         high_dpi:       true,  // important for mobile retina screens
         fullscreen:     false,
-        miniquad_conf: miniquad::conf::Conf {
-            platform: miniquad::conf::PlatformConf {
-                opengl_version: (2, 1),
-                ..Default::default()
-            },
-            ..Default::default()
-        },
+        platform: miniquad::conf::Platform::default(),
         ..Default::default()
     }
 }

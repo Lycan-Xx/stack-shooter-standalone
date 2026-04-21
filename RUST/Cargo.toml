@@ -9,14 +9,8 @@ description = "Vampire Siege — cross-platform survival shooter"
 # existing Canvas 2D code.
 [dependencies]
 macroquad      = "0.4"     # rendering, input, audio, window
-rand           = "0.8"     # random numbers (spawn positions, particles)
 serde          = { version = "1", features = ["derive"] }
 serde_json     = "1"       # load difficulty / upgrade configs at runtime
-
-# ── Web / WASM target ────────────────────────────────────────────────────────
-# When you run `cargo build --target wasm32-unknown-unknown` these apply.
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-# macroquad already handles WASM internally — nothing extra needed here.
 
 # ── Build profiles ───────────────────────────────────────────────────────────
 [profile.release]

@@ -10,7 +10,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 use std::collections::HashMap;
-use rand::seq::SliceRandom;
+use macroquad::rand::gen_range;
 use crate::config::UpgradeKey;
 use crate::entities::Player;
 
@@ -38,7 +38,11 @@ pub fn random_upgrades(
         .cloned()
         .collect();
 
-    available.shuffle(&mut rand::thread_rng());
+    let len = available.len();
+    for i in (1..len).rev() {
+        let j = gen_range(0, i + 1);
+        available.swap(i, j);
+    }
     available.truncate(count);
     available
 }
