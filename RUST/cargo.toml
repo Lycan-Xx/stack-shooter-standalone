@@ -1,0 +1,32 @@
+[package]
+name = "vampire_siege"
+version = "0.2.0"
+edition = "2021"
+description = "Vampire Siege — cross-platform survival shooter"
+
+# macroquad compiles to Web (WASM), Android, iOS, and Desktop
+# with a single codebase and near-identical draw calls to your
+# existing Canvas 2D code.
+[dependencies]
+macroquad      = "0.4"     # rendering, input, audio, window
+rand           = "0.8"     # random numbers (spawn positions, particles)
+serde          = { version = "1", features = ["derive"] }
+serde_json     = "1"       # load difficulty / upgrade configs at runtime
+
+# ── Web / WASM target ────────────────────────────────────────────────────────
+# When you run `cargo build --target wasm32-unknown-unknown` these apply.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+# macroquad already handles WASM internally — nothing extra needed here.
+
+# ── Build profiles ───────────────────────────────────────────────────────────
+[profile.release]
+opt-level     = 3
+lto           = true       # link-time optimisation  → smaller WASM bundle
+codegen-units = 1
+
+[profile.dev]
+opt-level     = 1          # fast enough for iteration without full debug lag
+
+[[bin]]
+name = "vampire_siege"
+path = "main.rs"
