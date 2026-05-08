@@ -1,0 +1,15 @@
+{
+  "name": "vampire_engine",
+  "type": "module",
+  "version": "0.1.0",
+  "files": [
+    "vampire_engine_bg.wasm",
+    "vampire_engine.js",
+    "vampire_engine.d.ts"
+  ],
+  "main": "vampire_engine.js",
+  "types": "vampire_engine.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}
