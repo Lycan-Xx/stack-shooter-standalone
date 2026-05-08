@@ -1,0 +1,8 @@
+# Rust build artifacts
+/target
+**/*.rs.bk
+Cargo.lock.bak
+
+# wasm-pack output (generated into ../src/engine/pkg, not here, but just in case)
+/pkg
+/wasm-pack.log
