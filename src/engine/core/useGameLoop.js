@@ -425,8 +425,17 @@ export function useGameLoop(canvasRef) {
            - (keys['w'] || keys['W'] || keys['arrowup']    ? 1 : 0);
     if (Math.abs(joy.x) > 0.2 || Math.abs(joy.y) > 0.2) { mx = joy.x; my = joy.y; }
 
+    // Aiming vector (Twin stick overrides mouse)
+    const aimJoy = window.aimJoystickInput || { x: 0, y: 0 };
+    let targetX = mouse.x;
+    let targetY = mouse.y;
+    if (Math.abs(aimJoy.x) > 0.1 || Math.abs(aimJoy.y) > 0.1) {
+      targetX = e.player_x() + aimJoy.x * 1000;
+      targetY = e.player_y() + aimJoy.y * 1000;
+    }
+
     // Step engine
-    const ev = e.step(dtMs, mx, my, mouse.x, mouse.y);
+    const ev = e.step(dtMs, mx, my, targetX, targetY);
     const bits = ev.bits;
     const shake = ev.shake;
     ev.free();

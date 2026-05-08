@@ -7,6 +7,11 @@ export default function Controls({ performDash, wasdKeys }) {
   const joystickActive = useRef(false);
   const joystickId = useRef(null);
 
+  const aimJoystickRef = useRef(null);
+  const aimStickRef = useRef(null);
+  const aimJoystickActive = useRef(false);
+  const aimJoystickId = useRef(null);
+
   // Detect if device has touch capability
   useEffect(() => {
     const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
@@ -99,10 +104,86 @@ export default function Controls({ performDash, wasdKeys }) {
     document.addEventListener('touchmove', handleTouchMove, { passive: false });
     document.addEventListener('touchend', handleTouchEnd, { passive: false });
 
+    // Right Joystick (Aiming)
+    const aimJoystickContainer = aimJoystickRef.current;
+    const aimStick = aimStickRef.current;
+    
+    if (!aimJoystickContainer || !aimStick) return;
+
+    const handleAimTouchStart = (e) => {
+      const touch = Array.from(e.changedTouches).find((t) => {
+        const rect = aimJoystickContainer.getBoundingClientRect();
+        return (
+          t.clientX >= rect.left &&
+          t.clientX <= rect.right &&
+          t.clientY >= rect.top &&
+          t.clientY <= rect.bottom
+        );
+      });
+
+      if (touch) {
+        e.preventDefault();
+        aimJoystickActive.current = true;
+        aimJoystickId.current = touch.identifier;
+        aimStick.classList.add('active');
+        window.mobileFireActive = true; // start firing
+        updateAimJoystick(touch);
+      }
+    };
+
+    const handleAimTouchMove = (e) => {
+      if (!aimJoystickActive.current) return;
+      const touch = Array.from(e.changedTouches).find((t) => t.identifier === aimJoystickId.current);
+      if (touch) {
+        e.preventDefault();
+        updateAimJoystick(touch);
+      }
+    };
+
+    const handleAimTouchEnd = (e) => {
+      const touch = Array.from(e.changedTouches).find((t) => t.identifier === aimJoystickId.current);
+      if (touch) {
+        e.preventDefault();
+        aimJoystickActive.current = false;
+        aimJoystickId.current = null;
+        aimStick.classList.remove('active');
+        aimStick.style.transform = 'translate(-50%, -50%)';
+        window.aimJoystickInput = { x: 0, y: 0 };
+        window.mobileFireActive = false; // stop firing
+      }
+    };
+
+    const updateAimJoystick = (touch) => {
+      const rect = aimJoystickContainer.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      let deltaX = touch.clientX - centerX;
+      let deltaY = touch.clientY - centerY;
+      const maxDistance = 35;
+      const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+      if (distance > maxDistance) {
+        deltaX = (deltaX / distance) * maxDistance;
+        deltaY = (deltaY / distance) * maxDistance;
+      }
+      aimStick.style.transform = `translate(calc(-50% + ${deltaX}px), calc(-50% + ${deltaY}px))`;
+      window.aimJoystickInput = {
+        x: deltaX / maxDistance,
+        y: deltaY / maxDistance,
+      };
+    };
+
+    aimJoystickContainer.addEventListener('touchstart', handleAimTouchStart, { passive: false });
+    document.addEventListener('touchmove', handleAimTouchMove, { passive: false });
+    document.addEventListener('touchend', handleAimTouchEnd, { passive: false });
+
     return () => {
       joystickContainer.removeEventListener('touchstart', handleTouchStart);
       document.removeEventListener('touchmove', handleTouchMove);
       document.removeEventListener('touchend', handleTouchEnd);
+      
+      aimJoystickContainer.removeEventListener('touchstart', handleAimTouchStart);
+      document.removeEventListener('touchmove', handleAimTouchMove);
+      document.removeEventListener('touchend', handleAimTouchEnd);
     };
   }, []);
 
@@ -114,14 +195,7 @@ export default function Controls({ performDash, wasdKeys }) {
     }
   };
 
-  const handleFirePress = () => {
-    // Set window flag for continuous firing while pressed
-    window.mobileFireActive = true;
-  };
 
-  const handleFireRelease = () => {
-    window.mobileFireActive = false;
-  };
 
   return (
     <>
@@ -175,21 +249,12 @@ export default function Controls({ performDash, wasdKeys }) {
           <div id="joystick-base"></div>
           <div id="joystick-stick" ref={stickRef}></div>
         </div>
+        <div id="joystick-container-right" ref={aimJoystickRef}>
+          <div id="joystick-base-right"></div>
+          <div id="joystick-stick-right" ref={aimStickRef}></div>
+        </div>
         
         <div className="mobile-action-buttons">
-          <button 
-            id="mobile-fire" 
-            onTouchStart={handleFirePress}
-            onTouchEnd={handleFireRelease}
-            onMouseDown={handleFirePress}
-            onMouseUp={handleFireRelease}
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="2" fill="currentColor"/>
-              <path d="M12 2v4M12 18v4M22 12h-4M6 12H2M19.07 4.93l-2.83 2.83M7.76 16.24l-2.83 2.83M19.07 19.07l-2.83-2.83M7.76 7.76L4.93 4.93"/>
-            </svg>
-          </button>
-          
           <button id="mobile-dash" onClick={handleDashClick}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M13 2L3 14h8l-1 8 10-12h-8l1-8z"/>

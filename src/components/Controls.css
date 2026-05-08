@@ -98,40 +98,49 @@
   background: rgba(107, 182, 255, 1);
 }
 
-.mobile-action-buttons {
+#joystick-container-right {
   position: absolute;
-  right: 20px;
+  right: 30px;
   bottom: 30px;
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
+  width: 120px;
+  height: 120px;
   pointer-events: auto;
 }
 
-#mobile-fire {
-  width: 75px;
-  height: 75px;
-  background: rgba(255, 50, 50, 0.3);
+#joystick-base-right {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
   border: 3px solid #ff3232;
   border-radius: 50%;
-  color: #fff;
+}
+
+#joystick-stick-right {
+  position: absolute;
+  width: 50px;
+  height: 50px;
+  background: rgba(255, 50, 50, 0.8);
+  border: 3px solid #ff6b6b;
+  border-radius: 50%;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  transition: background 0.1s;
+}
+
+#joystick-stick-right.active {
+  background: rgba(255, 107, 107, 1);
+}
+
+.mobile-action-buttons {
+  position: absolute;
+  left: 50%;
+  bottom: 30px;
+  transform: translateX(-50%);
   display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s;
-  padding: 0;
-}
-
-#mobile-fire svg {
-  width: 40px;
-  height: 40px;
-}
-
-#mobile-fire:active {
-  background: rgba(255, 50, 50, 0.7);
-  transform: scale(0.95);
-  box-shadow: 0 0 20px rgba(255, 50, 50, 0.6);
+  gap: 15px;
+  pointer-events: auto;
 }
 
 #mobile-dash {

@@ -13,12 +13,18 @@ body {
   -moz-osx-font-smoothing: grayscale;
   overflow: hidden;
   background: #000;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: none;
 }
 
 #root {
   width: 100vw;
   height: 100vh;
   overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: none;
 }
 
 canvas {

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Stack Shooter</string>
+    <string name="title_activity_main">Stack Shooter</string>
+    <string name="package_name">com.lycan.stackshooter</string>
+    <string name="custom_url_scheme">com.lycan.stackshooter</string>
+</resources>
