@@ -60,8 +60,12 @@ jobs:
       #    engine-rs/pkg/  →  src/engine/pkg/
       - name: Copy pkg output to src/engine/pkg
         run: |
+          rm -rf src/engine/pkg
           mkdir -p src/engine/pkg
           cp -r engine-rs/pkg/. src/engine/pkg/
+          # wasm-pack generates a .gitignore with '*' in the output dir. 
+          # We must remove it so git can track these files.
+          rm -f src/engine/pkg/.gitignore
 
       # 7. Commit & push only if the compiled output actually changed
       - name: Commit compiled WASM if changed
@@ -69,6 +73,7 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
+          # Add the entire directory, including any deleted files
           git add src/engine/pkg/
 
           # Check whether anything was staged
