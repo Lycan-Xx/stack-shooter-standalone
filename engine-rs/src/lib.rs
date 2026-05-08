@@ -111,7 +111,7 @@ struct Enemy {
 #[derive(Clone, Copy)]
 struct Particle { pos: Vec2, vel: Vec2, radius: f32, alpha: f32, decay: f32, color: u32 /* 0xRRGGBB */ }
 #[derive(Clone, Copy)]
-struct Blood    { pos: Vec2, radius: f32, alpha: f32, decay: f32 }
+struct Blood    { pos: Vec2, radius: f32, alpha: f32, decay: f32, satellites: [(f32, f32, f32); 3] }
 #[derive(Clone)]
 struct FloatText{ pos: Vec2, text: String, color: String, alpha: f32, vy: f32 }
 
@@ -139,8 +139,7 @@ pub struct Engine {
 
 const ENEMY_STRIDE: usize    = 9; // x,y,radius,size,hp,max_hp,kind,facing_left,is_charging
 const PARTICLE_STRIDE: usize = 7; // x,y,radius,alpha,r,g,b
-const BLOOD_STRIDE: usize    = 3; // x,y,alpha   (radius computed from constructor; we'll include radius too)
-                                   // -> actually 4: x,y,radius,alpha
+const BLOOD_STRIDE: usize    = 13; // x,y,radius,alpha + 3×(sat_ox,sat_oy,sat_radius)
 #[allow(dead_code)]
 const _ASSERT: () = ();
 
@@ -378,7 +377,7 @@ impl Engine {
                     e.last_attack_ms = now;
                     damage_taken += dmg;
                     events |= EV_PLAYER_HURT;
-                    shake = shake.max(if e.kind == EnemyKind::Boss { 6.0 } else { 4.0 });
+                    shake = shake.max(if e.kind == EnemyKind::Boss { 3.0 } else { 2.0 });
                     if self.player.health <= 0.0 {
                         player_dead = true;
                     }
@@ -478,10 +477,19 @@ impl Engine {
             });
             if killed {
                 // blood + particles + floating text
+                let blood_r = self.rng.range(10.0, 25.0);
+                let mut sats = [(0f32, 0f32, 0f32); 3];
+                for i in 0..3 {
+                    let angle = self.rng.frand() * std::f32::consts::TAU;
+                    let dist  = self.rng.frand() * blood_r;
+                    let sr    = self.rng.range(2.0, 7.0);
+                    sats[i]   = (angle.cos() * dist, angle.sin() * dist, sr);
+                }
                 self.blood.push(Blood {
                     pos: e.pos,
-                    radius: self.rng.range(10.0, 25.0),
+                    radius: blood_r,
                     alpha: 0.6, decay: 0.005,
+                    satellites: sats,
                 });
                 for _ in 0..15 {
                     self.particles.push(Particle {
@@ -550,12 +558,17 @@ impl Engine {
         }
 
         self.blood_buf.clear();
-        self.blood_buf.reserve(self.blood.len() * 4);
+        self.blood_buf.reserve(self.blood.len() * BLOOD_STRIDE);
         for b in self.blood.iter() {
             self.blood_buf.push(b.pos.x);
             self.blood_buf.push(b.pos.y);
             self.blood_buf.push(b.radius);
             self.blood_buf.push(b.alpha);
+            for (ox, oy, sr) in b.satellites.iter() {
+                self.blood_buf.push(*ox);
+                self.blood_buf.push(*oy);
+                self.blood_buf.push(*sr);
+            }
         }
     }
 
@@ -569,6 +582,7 @@ impl Engine {
 
     pub fn blood_ptr(&self) -> *const f32 { self.blood_buf.as_ptr() }
     pub fn blood_len(&self) -> u32 { self.blood.len() as u32 }
+    pub fn blood_stride(&self) -> u32 { BLOOD_STRIDE as u32 }
 
     // Floating text — copied to JS one-by-one (small count, infrequent)
     pub fn texts_count(&self) -> u32 { self.texts.len() as u32 }

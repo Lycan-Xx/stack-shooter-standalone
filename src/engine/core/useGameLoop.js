@@ -570,15 +570,23 @@ export function useGameLoop(canvasRef) {
     // Blood splatters first (behind enemies)
     const bloodLen = e.blood_len();
     if (bloodLen > 0) {
-      const bloodView = new Float32Array(mem.buffer, e.blood_ptr(), bloodLen * 4);
+      const bStride = e.blood_stride();
+      const bloodView = new Float32Array(mem.buffer, e.blood_ptr(), bloodLen * bStride);
       ctx.save();
       ctx.fillStyle = '#8b0000';
       for (let i = 0; i < bloodLen; i++) {
-        const o = i * 4;
+        const o = i * bStride;
         const x = bloodView[o], y = bloodView[o + 1],
               r = bloodView[o + 2], a = bloodView[o + 3];
         ctx.globalAlpha = a;
+        // Main splat circle
         ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+        // 3 pre-baked satellite blobs — matches original BloodSplatter.draw()
+        for (let s = 0; s < 3; s++) {
+          const so = o + 4 + s * 3;
+          const ox = bloodView[so], oy = bloodView[so + 1], sr = bloodView[so + 2];
+          ctx.beginPath(); ctx.arc(x + ox, y + oy, sr, 0, Math.PI * 2); ctx.fill();
+        }
       }
       ctx.globalAlpha = 1;
       ctx.restore();
