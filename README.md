@@ -162,8 +162,7 @@ See [`CHANGELOG.md`](CHANGELOG.md) for the full phase-by-phase history.
 ---
 
 ## 📝 License
-
-BSD-3-Clause — see [LICENSE](LICENSE).
+All Rights Reserved — see [LICENSE](LICENSE)
 
 ## 🔗 Links
 
