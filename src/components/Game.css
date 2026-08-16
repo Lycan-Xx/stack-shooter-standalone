@@ -4,11 +4,15 @@
   height: 100vh;
   overflow: hidden;
   background: #000;
+  /* Prevent address bar issues on mobile */
+  height: 100dvh;
 }
 
 #game-canvas {
   display: block;
   background: linear-gradient(135deg, #1a1a2e 0%, #0f0f1e 100%);
+  width: 100%;
+  height: 100%;
 }
 
 #ui-overlay {
@@ -85,6 +89,38 @@
   font-weight: bold;
   font-size: 14px;
   z-index: 10;
+}
+
+/* Landscape orientation for mobile */
+@media (orientation: landscape) {
+  #game-container {
+    height: 100dvh;
+  }
+
+  #difficulty-badge {
+    top: 10px;
+    left: 10px;
+    font-size: 12px;
+    padding: 5px 10px;
+  }
+
+  #wave-info {
+    font-size: 36px;
+  }
+}
+
+/* Portrait orientation fallback */
+@media (orientation: portrait) {
+  #game-container {
+    height: 100dvh;
+  }
+
+  #difficulty-badge {
+    top: 10px;
+    left: 10px;
+    font-size: 12px;
+    padding: 6px 12px;
+  }
 }
 
 @media (max-width: 768px) {

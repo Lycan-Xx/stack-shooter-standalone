@@ -4,7 +4,12 @@ const config: CapacitorConfig = {
   appId: 'com.lycan.stackshooter',
   appName: 'Stack Shooter',
   webDir: 'dist',
-  bundledWebRuntime: false
+  bundledWebRuntime: false,
+  plugins: {
+    ScreenOrientation: {
+      orientations: ['landscape']
+    }
+  }
 };
 
 export default config;

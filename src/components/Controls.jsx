@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import './Controls.css';
 
-export default function Controls({ performDash, wasdKeys }) {
+export default function Controls({ performDash, wasdKeys, togglePause }) {
   const joystickRef = useRef(null);
   const stickRef = useRef(null);
   const joystickActive = useRef(false);
@@ -189,11 +189,63 @@ export default function Controls({ performDash, wasdKeys }) {
 
   const handleDashClick = () => {
     const btn = document.getElementById('mobile-dash');
-    if (performDash()) {
+    if (btn && performDash()) {
       btn.classList.add('active');
       setTimeout(() => btn.classList.remove('active'), 200);
     }
   };
+
+  const handlePauseClick = () => {
+    if (togglePause) {
+      togglePause();
+    }
+  };
+
+  // Add touch event handlers for action buttons to prevent interference with joysticks
+  useEffect(() => {
+    const dashBtn = document.getElementById('mobile-dash');
+    const pauseBtn = document.getElementById('mobile-pause');
+
+    const handleActionTouchStart = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    };
+
+    const handleActionTouchMove = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    };
+
+    const handleActionTouchEnd = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    };
+
+    if (dashBtn) {
+      dashBtn.addEventListener('touchstart', handleActionTouchStart, { passive: false });
+      dashBtn.addEventListener('touchmove', handleActionTouchMove, { passive: false });
+      dashBtn.addEventListener('touchend', handleActionTouchEnd, { passive: false });
+    }
+
+    if (pauseBtn) {
+      pauseBtn.addEventListener('touchstart', handleActionTouchStart, { passive: false });
+      pauseBtn.addEventListener('touchmove', handleActionTouchMove, { passive: false });
+      pauseBtn.addEventListener('touchend', handleActionTouchEnd, { passive: false });
+    }
+
+    return () => {
+      if (dashBtn) {
+        dashBtn.removeEventListener('touchstart', handleActionTouchStart);
+        dashBtn.removeEventListener('touchmove', handleActionTouchMove);
+        dashBtn.removeEventListener('touchend', handleActionTouchEnd);
+      }
+      if (pauseBtn) {
+        pauseBtn.removeEventListener('touchstart', handleActionTouchStart);
+        pauseBtn.removeEventListener('touchmove', handleActionTouchMove);
+        pauseBtn.removeEventListener('touchend', handleActionTouchEnd);
+      }
+    };
+  }, []);
 
 
 
@@ -255,7 +307,13 @@ export default function Controls({ performDash, wasdKeys }) {
         </div>
         
         <div className="mobile-action-buttons">
-          <button id="mobile-dash" onClick={handleDashClick}>
+          <button id="mobile-pause" onClick={handlePauseClick} title="Pause">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <rect x="6" y="4" width="4" height="16"/>
+              <rect x="14" y="4" width="4" height="16"/>
+            </svg>
+          </button>
+          <button id="mobile-dash" onClick={handleDashClick} title="Dash">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M13 2L3 14h8l-1 8 10-12h-8l1-8z"/>
             </svg>

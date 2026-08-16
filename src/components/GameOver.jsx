@@ -1,25 +1,31 @@
 import { useState, useEffect } from 'react';
+import { gameStorage } from '../engine/systems/gameStorage.js';
 import './GameOver.css';
 
 export default function GameOver({ wave, kills, score, difficulty, onRestart, onMainMenu }) {
   const [personalBest, setPersonalBest] = useState(null);
   const [isNewBest, setIsNewBest] = useState(false);
+  const [rank, setRank] = useState(0);
 
   useEffect(() => {
     checkPersonalBest();
   }, []);
 
   const checkPersonalBest = () => {
-    // Get personal best from localStorage
-    const key = `best_${difficulty}`;
-    const stored = localStorage.getItem(key);
-    const best = stored ? parseInt(stored) : 0;
-
+    // Get personal best and high score rank from gameStorage
+    const best = gameStorage.getBestScore(difficulty);
     setPersonalBest(best);
 
     if (score > best) {
       setIsNewBest(true);
-      localStorage.setItem(key, score.toString());
+      const newRank = gameStorage.addHighScore(difficulty, { score, wave });
+      setRank(newRank);
+    } else {
+      // Check if already a high score
+      if (gameStorage.isHighScore(difficulty, score)) {
+        const newRank = gameStorage.addHighScore(difficulty, { score, wave });
+        setRank(newRank);
+      }
     }
   };
 
@@ -42,7 +48,12 @@ export default function GameOver({ wave, kills, score, difficulty, onRestart, on
     <div id="game-over">
       <h2>💀 Game Over 💀</h2>
 
-      {isNewBest && <div className="new-best-banner">🎉 NEW PERSONAL BEST! 🎉</div>}
+      {isNewBest && rank > 0 && (
+        <div className="new-best-banner">🏆 #{rank} NEW HIGH SCORE! 🏆</div>
+      )}
+      {isNewBest && rank === 0 && (
+        <div className="new-best-banner">🎉 NEW PERSONAL BEST! 🎉</div>
+      )}
 
       <div id="final-stats">
         <div className="stats-grid">
