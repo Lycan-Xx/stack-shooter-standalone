@@ -1,3 +1,5 @@
+[![Build Android APK](https://github.com/Lycan-Xx/stack-shooter-standalone/actions/workflows/build-android.yml/badge.svg)](https://github.com/Lycan-Xx/stack-shooter-standalone/actions/workflows/build-android.yml)
+
 # 🧛 Stack Shooter: Vampire Siege
 
 A community-focused survival shooter built for Reddit's Devvit platform. Defend against endless waves of vampires while competing with your subreddit and squad for glory.
