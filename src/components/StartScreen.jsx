@@ -1,10 +1,22 @@
 import { useState, useEffect } from 'react';
 import DifficultySelect from './DifficultySelect';
+import { getHighScores, getBestWave } from '../engine/systems/gameStorage.js';
 import './StartScreen.css';
 
 export default function StartScreen({ onStartGame, onStartTutorial }) {
   const [view, setView] = useState('main'); // main, difficulty
   const [showHowToPlay, setShowHowToPlay] = useState(false);
+  const [highScores, setHighScores] = useState({});
+
+  useEffect(() => {
+    // Load high scores on mount
+    const difficulties = ['easy', 'normal', 'hard', 'nightmare'];
+    const scores = {};
+    difficulties.forEach(diff => {
+      scores[diff] = getHighScores(diff).slice(0, 3); // Top 3 per difficulty
+    });
+    setHighScores(scores);
+  }, []);
 
   // Start Screen view
 
@@ -57,6 +69,39 @@ export default function StartScreen({ onStartGame, onStartTutorial }) {
             <span className="btn-text">How to Play</span>
           </button>
         </div>
+
+        {/* High Scores Display */}
+        {Object.values(highScores).some(scores => scores.length > 0) && (
+          <div className="high-scores-section">
+            <h3>🏆 Top Scores</h3>
+            <div className="high-scores-grid">
+              {['easy', 'normal', 'hard', 'nightmare'].map(difficulty => {
+                const scores = highScores[difficulty] || [];
+                const badges = { easy: '😊', normal: '😐', hard: '😰', nightmare: '💀' };
+                return (
+                  <div key={difficulty} className="high-scores-column">
+                    <div className="difficulty-header">
+                      <span className="badge">{badges[difficulty]}</span>
+                      <span className="label">{difficulty.toUpperCase()}</span>
+                    </div>
+                    {scores.length > 0 ? (
+                      <ol className="scores-list">
+                        {scores.map((score, idx) => (
+                          <li key={idx} className="score-entry">
+                            <span className="rank">#{idx + 1}</span>
+                            <span className="value">{score.score.toLocaleString()}</span>
+                          </li>
+                        ))}
+                      </ol>
+                    ) : (
+                      <p className="no-scores">No scores yet</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Controls Info */}
         <div className="controls-section">

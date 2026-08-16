@@ -11,6 +11,7 @@ import { RicochetEffect, drawPlayer } from '../systems/svgCharacters.js';
 import { tutorialSteps } from '../logic/tutorial.js';
 import { getRandomUpgrades, applyUpgrade } from '../logic/upgrades.js';
 import { soundManager } from '../systems/sound.js';
+import { gameStorage } from '../systems/gameStorage.js';
 
 import init, { Engine } from '../pkg/vampire_engine.js';
 import wasmUrl from '../pkg/vampire_engine_bg.wasm?url';
@@ -290,6 +291,19 @@ export function useGameLoop(canvasRef) {
       setDifficultyBadge(badges[selectedDifficulty]);
     }
 
+    // Load saved settings
+    const settings = gameStorage.getSettings();
+    if (settings.soundEnabled === false) {
+      soundManager.mute();
+    } else {
+      soundManager.unmute();
+    }
+    soundManager.setVolume(settings.soundVolume);
+    soundManager.setMusicVolume(settings.musicVolume);
+
+    // Save difficulty preference
+    gameStorage.setSettings({ difficulty: selectedDifficulty });
+
     setGameState('playing');
     game.state = 'playing';
     initGame();
@@ -316,6 +330,7 @@ export function useGameLoop(canvasRef) {
     soundManager.play('uiClick');
     game.tutorialStep++;
     if (game.tutorialStep >= tutorialSteps.length) {
+      gameStorage.markTutorialComplete();
       setGameState('playing');
       game.state = 'playing';
       game.difficulty = 'easy';
@@ -405,6 +420,17 @@ export function useGameLoop(canvasRef) {
     setGameState('gameOver');
     soundManager.play('gameOver');
     soundManager.stopMusic();
+
+    // PERSISTENCE: Save session
+    const session = {
+      wave: game.wave,
+      kills: game.kills,
+      score: game.score,
+      difficulty: game.difficulty,
+    };
+    gameStorage.setLastSession(session);
+    gameStorage.addLifetimeStats(game.kills, game.score);
+    gameStorage.updateHighestWave(game.difficulty, game.wave);
   };
 
   // ── Per-frame update via WASM ────────────────────────────────────────
