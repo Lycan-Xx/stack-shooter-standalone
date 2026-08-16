@@ -80,7 +80,7 @@ export default function Game() {
 
       <div id="crosshair"></div>
 
-      <Controls performDash={performDash} wasdKeys={wasdKeys} />
+      <Controls performDash={performDash} wasdKeys={wasdKeys} togglePause={togglePause} />
     </div>
   );
 }
