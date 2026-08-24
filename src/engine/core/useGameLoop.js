@@ -128,6 +128,7 @@ export function useGameLoop(canvasRef) {
     wave: 1,
     kills: 0,
     score: 0,
+    elapsedMs: 0,
     paused: false,
     difficulty: 'normal',
     challengeData: null,
@@ -176,6 +177,7 @@ export function useGameLoop(canvasRef) {
       enemies: e.enemies_len(),
       kills: game.kills,
       score: game.score,
+      durationMs: game.elapsedMs,
       dashEnergy: e.player_dash_energy(),
       maxDashEnergy: e.player_max_dash_energy(),
       dashCooldown: e.player_dash_cooldown(),
@@ -336,6 +338,7 @@ export function useGameLoop(canvasRef) {
     game.wave = 1;
     game.kills = 0;
     game.score = 0;
+    game.elapsedMs = 0;
     game.waveInProgress = false;
     game.waitingForNextWave = false;
     game.expectedEnemies = 0;
@@ -524,6 +527,7 @@ export function useGameLoop(canvasRef) {
     const keys = keysRef.current;
     if (!canvas || !e) return;
     if ((game.state !== 'playing' && game.state !== 'tutorial') || game.paused) return;
+    game.elapsedMs += dtMs;
 
     // Input vector
     const joy = window.joystickInput || { x: 0, y: 0 };
