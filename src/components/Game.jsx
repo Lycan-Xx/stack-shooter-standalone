@@ -72,8 +72,10 @@ export default function Game() {
 
         {isPaused && (gameState === 'playing' || gameState === 'tutorial') && (
           <PauseMenu 
-            onResume={togglePause} 
-            onExit={restartGame}
+            onResume={togglePause}
+            onRestart={restartGame}
+            onMainMenu={restartGame}
+            stats={hudData}
           />
         )}
       </div>
