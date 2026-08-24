@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import DifficultySelect from './DifficultySelect';
-import { getHighScores, getBestWave } from '../engine/systems/gameStorage.js';
+import { getHighScores, getBestWave, gameStorage } from '../engine/systems/gameStorage.js';
 import './StartScreen.css';
 import GamePanel from './ui/GamePanel';
 
@@ -8,6 +8,7 @@ export default function StartScreen({ onStartGame, onStartTutorial }) {
   const [view, setView] = useState('main'); // main, difficulty
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [highScores, setHighScores] = useState({});
+  const [profile, setProfile] = useState({ bestWave: 0, totalKills: 0, difficulty: 'normal' });
 
   useEffect(() => {
     // Load high scores on mount
@@ -17,6 +18,9 @@ export default function StartScreen({ onStartGame, onStartTutorial }) {
       scores[diff] = getHighScores(diff).slice(0, 3); // Top 3 per difficulty
     });
     setHighScores(scores);
+    const settings = gameStorage.getSettings();
+    const lifetime = gameStorage.getLifetimeStats();
+    setProfile({ bestWave: Math.max(...difficulties.map(getBestWave)), totalKills: lifetime.totalKills, difficulty: settings.difficulty || 'normal' });
   }, []);
 
   // Start Screen view
@@ -44,6 +48,7 @@ export default function StartScreen({ onStartGame, onStartTutorial }) {
     <>
       <div id="start-screen">
         <div className="header-section">
+          <p className="game-eyebrow">STACK SHOOTER</p>
           <h1 className="game-title">🧛 Vampire Siege</h1>
           <p className="game-description">
             Defend against endless hordes of vampires in this intense top-down shooter! 
@@ -51,11 +56,13 @@ export default function StartScreen({ onStartGame, onStartTutorial }) {
           </p>
         </div>
 
+        <GamePanel className="player-summary"><div><span>BEST WAVE</span><strong>{profile.bestWave}</strong></div><div><span>TOTAL KILLS</span><strong>{formatNumber(profile.totalKills)}</strong></div><div><span>MODE</span><strong>{profile.difficulty.toUpperCase()}</strong></div></GamePanel>
+
         {/* Main Menu Buttons */}
         <div className="main-menu">
           <button className="menu-btn primary" onClick={() => setView('difficulty')}>
             <span className="btn-icon">🎮</span>
-            <span className="btn-text">Solo Play</span>
+            <span className="btn-text">Quick Start</span>
             <span className="btn-subtitle">Choose your difficulty</span>
           </button>
 
