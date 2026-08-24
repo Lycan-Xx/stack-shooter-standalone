@@ -20,6 +20,88 @@ import wasmUrl from '../pkg/vampire_engine_bg.wasm?url';
 const EV_PLAYER_HURT = 1 << 0;
 const EV_GAME_OVER   = 1 << 1;
 
+function seededValue(index) {
+  const value = Math.sin(index * 12.9898 + 78.233) * 43758.5453;
+  return value - Math.floor(value);
+}
+
+function drawEnvironment(ctx, width, height) {
+  const centerX = width / 2;
+  const centerY = height / 2;
+  const scale = Math.max(0.75, Math.min(width, height) / 720);
+
+  const ground = ctx.createRadialGradient(centerX, centerY, 40 * scale, centerX, centerY, Math.max(width, height) * 0.72);
+  ground.addColorStop(0, '#1b2730');
+  ground.addColorStop(0.58, '#111a22');
+  ground.addColorStop(1, '#05080d');
+  ctx.fillStyle = ground;
+  ctx.fillRect(0, 0, width, height);
+
+  // Large, low-contrast stone slabs keep the battlefield readable.
+  ctx.save();
+  ctx.globalAlpha = 0.22;
+  ctx.strokeStyle = '#52616b';
+  ctx.lineWidth = 1;
+  const tile = 96 * scale;
+  for (let x = -tile; x < width + tile; x += tile) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + height * 0.08, height); ctx.stroke();
+  }
+  for (let y = 0; y < height; y += tile * 0.72) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y + width * 0.025); ctx.stroke();
+  }
+  ctx.restore();
+
+  // Deterministic visual-only blood stains and cracked ground decals.
+  ctx.save();
+  for (let i = 0; i < 18; i++) {
+    const x = seededValue(i + 20) * width;
+    const y = seededValue(i + 60) * height;
+    if (Math.abs(x - centerX) < width * 0.16 && Math.abs(y - centerY) < height * 0.18) continue;
+    const radius = (5 + seededValue(i + 90) * 16) * scale;
+    ctx.globalAlpha = 0.12 + seededValue(i + 110) * 0.12;
+    ctx.fillStyle = i % 3 === 0 ? '#6b1b27' : '#27353c';
+    ctx.beginPath(); ctx.ellipse(x, y, radius * 1.8, radius, seededValue(i) * Math.PI, 0, Math.PI * 2); ctx.fill();
+    if (i % 4 === 0) {
+      ctx.strokeStyle = '#53636a'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x - radius, y); ctx.lineTo(x + radius * 2, y - radius * 0.4); ctx.stroke();
+    }
+  }
+  ctx.restore();
+
+  // Edge props: deliberately non-colliding, decorative silhouettes.
+  ctx.save();
+  for (let i = 0; i < 8; i++) {
+    const side = i % 4;
+    const along = seededValue(i + 140);
+    const x = side === 1 ? width - 38 * scale : side === 3 ? 38 * scale : along * width;
+    const y = side === 0 ? 34 * scale : side === 2 ? height - 34 * scale : along * height;
+    const size = (18 + seededValue(i + 160) * 18) * scale;
+    ctx.globalAlpha = 0.72;
+    ctx.fillStyle = '#0a1015';
+    if (i % 3 === 0) {
+      // Gravestone
+      ctx.beginPath(); ctx.roundRect(x - size * 0.42, y - size, size * 0.84, size * 1.5, size * 0.18); ctx.fill();
+      ctx.strokeStyle = '#3d505a'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.globalAlpha = 0.35; ctx.strokeStyle = '#7c303c';
+      ctx.beginPath(); ctx.moveTo(x, y - size * 0.58); ctx.lineTo(x, y - size * 0.18); ctx.moveTo(x - size * 0.2, y - size * 0.38); ctx.lineTo(x + size * 0.2, y - size * 0.38); ctx.stroke();
+    } else {
+      // Dead tree / broken pillar silhouette
+      ctx.strokeStyle = '#111b21'; ctx.lineWidth = Math.max(4, size * 0.18);
+      ctx.beginPath(); ctx.moveTo(x, y + size); ctx.lineTo(x - size * 0.08, y - size); ctx.lineTo(x - size * 0.55, y - size * 1.35); ctx.moveTo(x - size * 0.08, y - size * 0.42); ctx.lineTo(x + size * 0.52, y - size * 0.92); ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+function drawAtmosphere(ctx, width, height) {
+  const edge = ctx.createRadialGradient(width / 2, height / 2, Math.min(width, height) * 0.26, width / 2, height / 2, Math.max(width, height) * 0.72);
+  edge.addColorStop(0, 'rgba(0,0,0,0)');
+  edge.addColorStop(0.7, 'rgba(3,6,10,0.12)');
+  edge.addColorStop(1, 'rgba(1,2,5,0.72)');
+  ctx.fillStyle = edge;
+  ctx.fillRect(0, 0, width, height);
+}
+
 export function useGameLoop(canvasRef) {
   const [gameState, setGameState] = useState('start');
   const [hudData, setHudData] = useState({
@@ -578,6 +660,8 @@ export function useGameLoop(canvasRef) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     if (game.state !== 'playing' && game.state !== 'tutorial') return;
 
+    drawEnvironment(ctx, canvas.width, canvas.height);
+
     e.build_render_buffers();
 
     const playerX = e.player_x();
@@ -735,6 +819,8 @@ export function useGameLoop(canvasRef) {
 
     // Ricochets (JS-side visual)
     ricochetEffectsRef.current.forEach(r => r.draw(ctx));
+
+    drawAtmosphere(ctx, canvas.width, canvas.height);
   };
 
   // ── RAF loop ─────────────────────────────────────────────────────────
