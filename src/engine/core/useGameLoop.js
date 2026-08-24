@@ -337,7 +337,9 @@ export function useGameLoop(canvasRef) {
     const canvas = canvasRef.current;
     if (!e || !canvas) return;
 
-    game.state = 'playing';
+    // Keep the state selected by the caller. Tutorial setup uses the same
+    // reset path but must remain tutorial-owned until the player finishes it.
+    game.state = game.state === 'tutorial' ? 'tutorial' : 'playing';
     game.wave = 1;
     game.kills = 0;
     game.score = 0;
