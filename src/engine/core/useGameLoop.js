@@ -12,6 +12,7 @@ import { getRandomUpgrades, applyUpgrade } from '../logic/upgrades.js';
 import { soundManager } from '../systems/sound.js';
 import { gameStorage } from '../systems/gameStorage.js';
 import { createSpriteRenderer } from '../systems/spriteRenderer.js';
+import { Haptics, ImpactStyle } from '@capacitor/haptics';
 
 import init, { Engine } from '../pkg/vampire_engine.js';
 import wasmUrl from '../pkg/vampire_engine_bg.wasm?url';
@@ -593,6 +594,7 @@ export function useGameLoop(canvasRef) {
           if (killCount > 0) {
             game.kills += killCount;
             game.score += scoreSum;
+            Haptics.impact({ style: ImpactStyle.Light }).catch(() => {});
           }
         }
         soundManager.play('shoot');
@@ -606,6 +608,7 @@ export function useGameLoop(canvasRef) {
           endY: playerY + Math.sin(angle) * len,
           alpha: 1, createdAt: performance.now(),
         });
+        game.muzzleFlash = { x: playerX, y: playerY, angle, until: performance.now() + 70 };
       }
     }
 
@@ -749,6 +752,16 @@ export function useGameLoop(canvasRef) {
             ctx.beginPath(); ctx.arc(x, y, radius + 10, 0, Math.PI * 2); ctx.stroke();
             ctx.setLineDash([]);
           }
+          // Keep the boss readable as a major checkpoint on mobile and desktop.
+          const hudWidth = Math.min(360, canvas.width * 0.52);
+          const hudX = (canvas.width - hudWidth) / 2;
+          const hudY = 24;
+          ctx.fillStyle = 'rgba(5, 8, 13, .82)'; ctx.fillRect(hudX - 12, hudY - 10, hudWidth + 24, 42);
+          ctx.fillStyle = '#ff6b78'; ctx.font = '700 11px Arial'; ctx.textAlign = 'center';
+          ctx.fillText('VAMPIRIC LORD MALGOR', canvas.width / 2, hudY + 2);
+          ctx.fillStyle = 'rgba(80, 10, 20, .9)'; ctx.fillRect(hudX, hudY + 10, hudWidth, 8);
+          ctx.fillStyle = '#e5485d'; ctx.fillRect(hudX, hudY + 10, hudWidth * Math.max(0, Math.min(1, hp / maxHp)), 8);
+          ctx.strokeStyle = 'rgba(255, 107, 120, .7)'; ctx.strokeRect(hudX, hudY + 10, hudWidth, 8);
         } else {
           spriteRendererRef.current.drawEnemy(ctx, { id: i, x, y, size, facingLeft, hp, maxHp, boss: false, moving: true, time: performance.now() });
           if (hp < maxHp) {
@@ -783,6 +796,14 @@ export function useGameLoop(canvasRef) {
         ctx.restore();
         return true;
       });
+    }
+
+    if (game.muzzleFlash && game.muzzleFlash.until > performance.now()) {
+      const flash = game.muzzleFlash;
+      ctx.save(); ctx.translate(flash.x, flash.y); ctx.rotate(flash.angle);
+      ctx.globalAlpha = (flash.until - performance.now()) / 70;
+      ctx.fillStyle = '#ffd166'; ctx.shadowColor = '#ff9f1c'; ctx.shadowBlur = 18;
+      ctx.beginPath(); ctx.moveTo(18, 0); ctx.lineTo(48, -10); ctx.lineTo(35, 0); ctx.lineTo(48, 10); ctx.closePath(); ctx.fill(); ctx.restore();
     }
 
     // Particles
