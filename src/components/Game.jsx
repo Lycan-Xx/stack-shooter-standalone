@@ -56,6 +56,7 @@ export default function Game() {
             wave={hudData.wave}
             kills={hudData.kills}
             score={hudData.score}
+            durationMs={hudData.durationMs}
             difficulty={hudData.difficulty || 'normal'}
             onRestart={restartGame}
             onMainMenu={restartGame}
@@ -72,8 +73,10 @@ export default function Game() {
 
         {isPaused && (gameState === 'playing' || gameState === 'tutorial') && (
           <PauseMenu 
-            onResume={togglePause} 
-            onExit={restartGame}
+            onResume={togglePause}
+            onRestart={restartGame}
+            onMainMenu={restartGame}
+            stats={hudData}
           />
         )}
       </div>

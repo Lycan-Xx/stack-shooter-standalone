@@ -1,0 +1,71 @@
+:root {
+  --game-bg: #080c12;
+  --game-bg-secondary: #0d131c;
+  --panel: rgba(12, 20, 30, 0.88);
+  --panel-light: rgba(20, 31, 44, 0.88);
+  --border: rgba(125, 190, 255, 0.25);
+  --border-strong: rgba(103, 200, 255, 0.62);
+  --blue: #67c8ff;
+  --blue-bright: #91dbff;
+  --red: #ff3f4f;
+  --red-dark: #8e1625;
+  --green: #58df8a;
+  --gold: #f4b942;
+  --text: #edf3f8;
+  --text-secondary: #99a7b4;
+  --danger: #ff4757;
+  --font-display: 'Space Grotesk', 'Segoe UI', sans-serif;
+  --font-body: 'Hanken Grotesk', 'Segoe UI', sans-serif;
+  --font-tech: 'JetBrains Mono', 'Courier New', monospace;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --shadow-panel: 0 12px 40px rgba(0, 0, 0, 0.35), 0 0 24px rgba(103, 200, 255, 0.08);
+}
+
+.game-panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-panel);
+  backdrop-filter: blur(12px);
+}
+
+.game-button {
+  appearance: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel-light);
+  color: var(--text);
+  font: 700 0.95rem var(--font-display);
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.game-button:hover,
+.game-button:focus-visible {
+  border-color: var(--border-strong);
+  background: rgba(31, 52, 70, 0.92);
+  box-shadow: 0 0 18px rgba(103, 200, 255, 0.18);
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.game-button:active { transform: translateY(0); }
+
+.game-button--primary {
+  background: linear-gradient(135deg, rgba(103, 200, 255, 0.22), rgba(39, 102, 145, 0.22));
+  border-color: var(--blue);
+}
+
+.game-button--danger { border-color: rgba(255, 71, 87, 0.55); }
+
+.section-heading {
+  color: var(--blue-bright);
+  font: 700 0.75rem var(--font-tech);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .game-button { transition: none; }
+}

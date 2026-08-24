@@ -6,12 +6,13 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { DIFFICULTY } from '../logic/difficulty.js';
-import { drawVampire, drawBossVampire } from '../systems/svgCharacters.js';
-import { RicochetEffect, drawPlayer } from '../systems/svgCharacters.js';
+import { RicochetEffect } from '../systems/svgCharacters.js';
 import { tutorialSteps } from '../logic/tutorial.js';
 import { getRandomUpgrades, applyUpgrade } from '../logic/upgrades.js';
 import { soundManager } from '../systems/sound.js';
 import { gameStorage } from '../systems/gameStorage.js';
+import { createSpriteRenderer } from '../systems/spriteRenderer.js';
+import { Haptics, ImpactStyle } from '@capacitor/haptics';
 
 import init, { Engine } from '../pkg/vampire_engine.js';
 import wasmUrl from '../pkg/vampire_engine_bg.wasm?url';
@@ -19,6 +20,88 @@ import wasmUrl from '../pkg/vampire_engine_bg.wasm?url';
 // Engine-side bit flags (must mirror lib.rs)
 const EV_PLAYER_HURT = 1 << 0;
 const EV_GAME_OVER   = 1 << 1;
+
+function seededValue(index) {
+  const value = Math.sin(index * 12.9898 + 78.233) * 43758.5453;
+  return value - Math.floor(value);
+}
+
+function drawEnvironment(ctx, width, height) {
+  const centerX = width / 2;
+  const centerY = height / 2;
+  const scale = Math.max(0.75, Math.min(width, height) / 720);
+
+  const ground = ctx.createRadialGradient(centerX, centerY, 40 * scale, centerX, centerY, Math.max(width, height) * 0.72);
+  ground.addColorStop(0, '#1b2730');
+  ground.addColorStop(0.58, '#111a22');
+  ground.addColorStop(1, '#05080d');
+  ctx.fillStyle = ground;
+  ctx.fillRect(0, 0, width, height);
+
+  // Large, low-contrast stone slabs keep the battlefield readable.
+  ctx.save();
+  ctx.globalAlpha = 0.22;
+  ctx.strokeStyle = '#52616b';
+  ctx.lineWidth = 1;
+  const tile = 96 * scale;
+  for (let x = -tile; x < width + tile; x += tile) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + height * 0.08, height); ctx.stroke();
+  }
+  for (let y = 0; y < height; y += tile * 0.72) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y + width * 0.025); ctx.stroke();
+  }
+  ctx.restore();
+
+  // Deterministic visual-only blood stains and cracked ground decals.
+  ctx.save();
+  for (let i = 0; i < 18; i++) {
+    const x = seededValue(i + 20) * width;
+    const y = seededValue(i + 60) * height;
+    if (Math.abs(x - centerX) < width * 0.16 && Math.abs(y - centerY) < height * 0.18) continue;
+    const radius = (5 + seededValue(i + 90) * 16) * scale;
+    ctx.globalAlpha = 0.12 + seededValue(i + 110) * 0.12;
+    ctx.fillStyle = i % 3 === 0 ? '#6b1b27' : '#27353c';
+    ctx.beginPath(); ctx.ellipse(x, y, radius * 1.8, radius, seededValue(i) * Math.PI, 0, Math.PI * 2); ctx.fill();
+    if (i % 4 === 0) {
+      ctx.strokeStyle = '#53636a'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x - radius, y); ctx.lineTo(x + radius * 2, y - radius * 0.4); ctx.stroke();
+    }
+  }
+  ctx.restore();
+
+  // Edge props: deliberately non-colliding, decorative silhouettes.
+  ctx.save();
+  for (let i = 0; i < 8; i++) {
+    const side = i % 4;
+    const along = seededValue(i + 140);
+    const x = side === 1 ? width - 38 * scale : side === 3 ? 38 * scale : along * width;
+    const y = side === 0 ? 34 * scale : side === 2 ? height - 34 * scale : along * height;
+    const size = (18 + seededValue(i + 160) * 18) * scale;
+    ctx.globalAlpha = 0.72;
+    ctx.fillStyle = '#0a1015';
+    if (i % 3 === 0) {
+      // Gravestone
+      ctx.beginPath(); ctx.roundRect(x - size * 0.42, y - size, size * 0.84, size * 1.5, size * 0.18); ctx.fill();
+      ctx.strokeStyle = '#3d505a'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.globalAlpha = 0.35; ctx.strokeStyle = '#7c303c';
+      ctx.beginPath(); ctx.moveTo(x, y - size * 0.58); ctx.lineTo(x, y - size * 0.18); ctx.moveTo(x - size * 0.2, y - size * 0.38); ctx.lineTo(x + size * 0.2, y - size * 0.38); ctx.stroke();
+    } else {
+      // Dead tree / broken pillar silhouette
+      ctx.strokeStyle = '#111b21'; ctx.lineWidth = Math.max(4, size * 0.18);
+      ctx.beginPath(); ctx.moveTo(x, y + size); ctx.lineTo(x - size * 0.08, y - size); ctx.lineTo(x - size * 0.55, y - size * 1.35); ctx.moveTo(x - size * 0.08, y - size * 0.42); ctx.lineTo(x + size * 0.52, y - size * 0.92); ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+function drawAtmosphere(ctx, width, height) {
+  const edge = ctx.createRadialGradient(width / 2, height / 2, Math.min(width, height) * 0.26, width / 2, height / 2, Math.max(width, height) * 0.72);
+  edge.addColorStop(0, 'rgba(0,0,0,0)');
+  edge.addColorStop(0.7, 'rgba(3,6,10,0.12)');
+  edge.addColorStop(1, 'rgba(1,2,5,0.72)');
+  ctx.fillStyle = edge;
+  ctx.fillRect(0, 0, width, height);
+}
 
 export function useGameLoop(canvasRef) {
   const [gameState, setGameState] = useState('start');
@@ -46,6 +129,7 @@ export function useGameLoop(canvasRef) {
     wave: 1,
     kills: 0,
     score: 0,
+    elapsedMs: 0,
     paused: false,
     difficulty: 'normal',
     challengeData: null,
@@ -66,6 +150,8 @@ export function useGameLoop(canvasRef) {
 
   // Visual-only effect lists (small, kept in JS)
   const ricochetEffectsRef = useRef([]);
+  const spriteRendererRef = useRef(null);
+  if (!spriteRendererRef.current) spriteRendererRef.current = createSpriteRenderer();
 
   // ── Engine init ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -94,6 +180,7 @@ export function useGameLoop(canvasRef) {
       enemies: e.enemies_len(),
       kills: game.kills,
       score: game.score,
+      durationMs: game.elapsedMs,
       dashEnergy: e.player_dash_energy(),
       maxDashEnergy: e.player_max_dash_energy(),
       dashCooldown: e.player_dash_cooldown(),
@@ -250,10 +337,13 @@ export function useGameLoop(canvasRef) {
     const canvas = canvasRef.current;
     if (!e || !canvas) return;
 
-    game.state = 'playing';
+    // Keep the state selected by the caller. Tutorial setup uses the same
+    // reset path but must remain tutorial-owned until the player finishes it.
+    game.state = game.state === 'tutorial' ? 'tutorial' : 'playing';
     game.wave = 1;
     game.kills = 0;
     game.score = 0;
+    game.elapsedMs = 0;
     game.waveInProgress = false;
     game.waitingForNextWave = false;
     game.expectedEnemies = 0;
@@ -442,6 +532,7 @@ export function useGameLoop(canvasRef) {
     const keys = keysRef.current;
     if (!canvas || !e) return;
     if ((game.state !== 'playing' && game.state !== 'tutorial') || game.paused) return;
+    game.elapsedMs += dtMs;
 
     // Input vector
     const joy = window.joystickInput || { x: 0, y: 0 };
@@ -505,6 +596,7 @@ export function useGameLoop(canvasRef) {
           if (killCount > 0) {
             game.kills += killCount;
             game.score += scoreSum;
+            Haptics.impact({ style: ImpactStyle.Light }).catch(() => {});
           }
         }
         soundManager.play('shoot');
@@ -518,6 +610,7 @@ export function useGameLoop(canvasRef) {
           endY: playerY + Math.sin(angle) * len,
           alpha: 1, createdAt: performance.now(),
         });
+        game.muzzleFlash = { x: playerX, y: playerY, angle, until: performance.now() + 70 };
       }
     }
 
@@ -578,6 +671,8 @@ export function useGameLoop(canvasRef) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     if (game.state !== 'playing' && game.state !== 'tutorial') return;
 
+    drawEnvironment(ctx, canvas.width, canvas.height);
+
     e.build_render_buffers();
 
     const playerX = e.player_x();
@@ -600,7 +695,7 @@ export function useGameLoop(canvasRef) {
     ctx.restore();
 
     // Player
-    drawPlayer(ctx, playerX, playerY, playerSize, playerAngle, playerDashing);
+    spriteRendererRef.current.drawPlayer(ctx, { x: playerX, y: playerY, size: playerSize, angle: playerAngle, dashing: playerDashing, moving: true, time: performance.now() });
 
     // Blood splatters first (behind enemies)
     const bloodLen = e.blood_len();
@@ -640,7 +735,7 @@ export function useGameLoop(canvasRef) {
         const facingLeft = view[o + 7] > 0.5;
         const isCharging = view[o + 8] > 0.5;
         if (isBoss) {
-          drawBossVampire(ctx, x, y, size, facingLeft, hp / maxHp, performance.now());
+          spriteRendererRef.current.drawEnemy(ctx, { id: i, x, y, size, facingLeft, hp, maxHp, boss: true, moving: isCharging, time: performance.now() });
           // Boss bar
           const bw = 80, bh = 8;
           ctx.fillStyle = 'rgba(50,0,0,0.9)';
@@ -659,8 +754,18 @@ export function useGameLoop(canvasRef) {
             ctx.beginPath(); ctx.arc(x, y, radius + 10, 0, Math.PI * 2); ctx.stroke();
             ctx.setLineDash([]);
           }
+          // Keep the boss readable as a major checkpoint on mobile and desktop.
+          const hudWidth = Math.min(360, canvas.width * 0.52);
+          const hudX = (canvas.width - hudWidth) / 2;
+          const hudY = 24;
+          ctx.fillStyle = 'rgba(5, 8, 13, .82)'; ctx.fillRect(hudX - 12, hudY - 10, hudWidth + 24, 42);
+          ctx.fillStyle = '#ff6b78'; ctx.font = '700 11px Arial'; ctx.textAlign = 'center';
+          ctx.fillText('VAMPIRIC LORD MALGOR', canvas.width / 2, hudY + 2);
+          ctx.fillStyle = 'rgba(80, 10, 20, .9)'; ctx.fillRect(hudX, hudY + 10, hudWidth, 8);
+          ctx.fillStyle = '#e5485d'; ctx.fillRect(hudX, hudY + 10, hudWidth * Math.max(0, Math.min(1, hp / maxHp)), 8);
+          ctx.strokeStyle = 'rgba(255, 107, 120, .7)'; ctx.strokeRect(hudX, hudY + 10, hudWidth, 8);
         } else {
-          drawVampire(ctx, x, y, size, facingLeft, hp / maxHp);
+          spriteRendererRef.current.drawEnemy(ctx, { id: i, x, y, size, facingLeft, hp, maxHp, boss: false, moving: true, time: performance.now() });
           if (hp < maxHp) {
             const bw = 50, bh = 6;
             const bx = x - bw / 2, by = y - size / 2 - 15;
@@ -693,6 +798,14 @@ export function useGameLoop(canvasRef) {
         ctx.restore();
         return true;
       });
+    }
+
+    if (game.muzzleFlash && game.muzzleFlash.until > performance.now()) {
+      const flash = game.muzzleFlash;
+      ctx.save(); ctx.translate(flash.x, flash.y); ctx.rotate(flash.angle);
+      ctx.globalAlpha = (flash.until - performance.now()) / 70;
+      ctx.fillStyle = '#ffd166'; ctx.shadowColor = '#ff9f1c'; ctx.shadowBlur = 18;
+      ctx.beginPath(); ctx.moveTo(18, 0); ctx.lineTo(48, -10); ctx.lineTo(35, 0); ctx.lineTo(48, 10); ctx.closePath(); ctx.fill(); ctx.restore();
     }
 
     // Particles
@@ -735,6 +848,8 @@ export function useGameLoop(canvasRef) {
 
     // Ricochets (JS-side visual)
     ricochetEffectsRef.current.forEach(r => r.draw(ctx));
+
+    drawAtmosphere(ctx, canvas.width, canvas.height);
   };
 
   // ── RAF loop ─────────────────────────────────────────────────────────

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import './Controls.css';
 
 export default function Controls({ performDash, wasdKeys, togglePause }) {
@@ -191,6 +192,7 @@ export default function Controls({ performDash, wasdKeys, togglePause }) {
     const btn = document.getElementById('mobile-dash');
     if (btn && performDash()) {
       btn.classList.add('active');
+      Haptics.impact({ style: ImpactStyle.Light }).catch(() => {});
       setTimeout(() => btn.classList.remove('active'), 200);
     }
   };
@@ -298,25 +300,26 @@ export default function Controls({ performDash, wasdKeys, togglePause }) {
       {/* Mobile Controls */}
       <div id="mobile-controls">
         <div id="joystick-container" ref={joystickRef}>
-          <div id="joystick-base"></div>
+          <div id="joystick-base"><span className="control-label">MOVE</span></div>
           <div id="joystick-stick" ref={stickRef}></div>
         </div>
         <div id="joystick-container-right" ref={aimJoystickRef}>
-          <div id="joystick-base-right"></div>
+          <div id="joystick-base-right"><span className="control-label">FIRE</span></div>
           <div id="joystick-stick-right" ref={aimStickRef}></div>
         </div>
         
         <div className="mobile-action-buttons">
-          <button id="mobile-pause" onClick={handlePauseClick} title="Pause">
+          <button id="mobile-pause" onClick={handlePauseClick} title="Pause" aria-label="Pause game">
             <svg viewBox="0 0 24 24" fill="currentColor">
               <rect x="6" y="4" width="4" height="16"/>
               <rect x="14" y="4" width="4" height="16"/>
             </svg>
           </button>
-          <button id="mobile-dash" onClick={handleDashClick} title="Dash">
+          <button id="mobile-dash" onClick={handleDashClick} title="Dash" aria-label="Dash">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M13 2L3 14h8l-1 8 10-12h-8l1-8z"/>
             </svg>
+            <span className="action-label">DASH</span>
           </button>
         </div>
       </div>

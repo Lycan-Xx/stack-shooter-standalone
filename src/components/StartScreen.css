@@ -10,6 +10,14 @@
   text-align: center;
 }
 
+.game-eyebrow { margin: 18px 0 2px; color: var(--red); font: 700 .72rem var(--font-tech); letter-spacing: .3em; }
+.player-summary { display: grid; grid-template-columns: repeat(3, 1fr); width: min(600px, 100%); margin: 0 0 18px; padding: 12px; }
+.player-summary div { display: grid; gap: 4px; border-right: 1px solid var(--border); }
+.player-summary div:last-child { border: 0; }
+.player-summary span { color: var(--text-secondary); font: .6rem var(--font-tech); letter-spacing: .08em; }
+.player-summary strong { color: var(--blue-bright); font: 700 1rem var(--font-tech); }
+.game-title { font-family: var(--font-display); background: linear-gradient(135deg, var(--text) 15%, var(--blue) 80%); -webkit-background-clip: text; background-clip: text; }
+
 .header-section {
   margin-bottom: 15px;
   flex-shrink: 0;
