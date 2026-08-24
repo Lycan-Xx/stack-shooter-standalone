@@ -1,20 +1,22 @@
 import './PauseMenu.css';
+import GameButton from './ui/GameButton';
+import GamePanel from './ui/GamePanel';
 
 export default function PauseMenu({ onResume, onExit }) {
   return (
     <div id="pause-menu">
-      <div className="pause-content">
+      <GamePanel className="pause-content">
         <h2>⏸️ PAUSED</h2>
         <p>Press ESC to resume</p>
         <div className="pause-buttons">
-          <button className="btn pause-btn" onClick={onResume}>
+          <GameButton className="btn pause-btn" variant="primary" onClick={onResume}>
             ▶️ Resume Game
-          </button>
-          <button className="btn pause-btn secondary" onClick={onExit}>
+          </GameButton>
+          <GameButton className="btn pause-btn secondary" variant="danger" onClick={onExit}>
             🚪 Exit Game
-          </button>
+          </GameButton>
         </div>
-      </div>
+      </GamePanel>
     </div>
   );
 }

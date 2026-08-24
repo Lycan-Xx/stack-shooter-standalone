@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import DifficultySelect from './DifficultySelect';
 import { getHighScores, getBestWave } from '../engine/systems/gameStorage.js';
 import './StartScreen.css';
+import GamePanel from './ui/GamePanel';
 
 export default function StartScreen({ onStartGame, onStartTutorial }) {
   const [view, setView] = useState('main'); // main, difficulty
@@ -72,7 +73,7 @@ export default function StartScreen({ onStartGame, onStartTutorial }) {
 
         {/* High Scores Display */}
         {Object.values(highScores).some(scores => scores.length > 0) && (
-          <div className="high-scores-section">
+          <GamePanel className="high-scores-section">
             <h3>🏆 Top Scores</h3>
             <div className="high-scores-grid">
               {['easy', 'normal', 'hard', 'nightmare'].map(difficulty => {
@@ -100,7 +101,7 @@ export default function StartScreen({ onStartGame, onStartTutorial }) {
                 );
               })}
             </div>
-          </div>
+          </GamePanel>
         )}
 
         {/* Controls Info */}
