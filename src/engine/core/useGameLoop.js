@@ -6,12 +6,12 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { DIFFICULTY } from '../logic/difficulty.js';
-import { drawVampire, drawBossVampire } from '../systems/svgCharacters.js';
-import { RicochetEffect, drawPlayer } from '../systems/svgCharacters.js';
+import { RicochetEffect } from '../systems/svgCharacters.js';
 import { tutorialSteps } from '../logic/tutorial.js';
 import { getRandomUpgrades, applyUpgrade } from '../logic/upgrades.js';
 import { soundManager } from '../systems/sound.js';
 import { gameStorage } from '../systems/gameStorage.js';
+import { createSpriteRenderer } from '../systems/spriteRenderer.js';
 
 import init, { Engine } from '../pkg/vampire_engine.js';
 import wasmUrl from '../pkg/vampire_engine_bg.wasm?url';
@@ -149,6 +149,8 @@ export function useGameLoop(canvasRef) {
 
   // Visual-only effect lists (small, kept in JS)
   const ricochetEffectsRef = useRef([]);
+  const spriteRendererRef = useRef(null);
+  if (!spriteRendererRef.current) spriteRendererRef.current = createSpriteRenderer();
 
   // ── Engine init ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -688,7 +690,7 @@ export function useGameLoop(canvasRef) {
     ctx.restore();
 
     // Player
-    drawPlayer(ctx, playerX, playerY, playerSize, playerAngle, playerDashing);
+    spriteRendererRef.current.drawPlayer(ctx, { x: playerX, y: playerY, size: playerSize, angle: playerAngle, dashing: playerDashing, moving: true, time: performance.now() });
 
     // Blood splatters first (behind enemies)
     const bloodLen = e.blood_len();
@@ -728,7 +730,7 @@ export function useGameLoop(canvasRef) {
         const facingLeft = view[o + 7] > 0.5;
         const isCharging = view[o + 8] > 0.5;
         if (isBoss) {
-          drawBossVampire(ctx, x, y, size, facingLeft, hp / maxHp, performance.now());
+          spriteRendererRef.current.drawEnemy(ctx, { id: i, x, y, size, facingLeft, hp, maxHp, boss: true, moving: isCharging, time: performance.now() });
           // Boss bar
           const bw = 80, bh = 8;
           ctx.fillStyle = 'rgba(50,0,0,0.9)';
@@ -748,7 +750,7 @@ export function useGameLoop(canvasRef) {
             ctx.setLineDash([]);
           }
         } else {
-          drawVampire(ctx, x, y, size, facingLeft, hp / maxHp);
+          spriteRendererRef.current.drawEnemy(ctx, { id: i, x, y, size, facingLeft, hp, maxHp, boss: false, moving: true, time: performance.now() });
           if (hp < maxHp) {
             const bw = 50, bh = 6;
             const bx = x - bw / 2, by = y - size / 2 - 15;
