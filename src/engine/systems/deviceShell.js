@@ -1,4 +1,15 @@
+import { registerPlugin } from '@capacitor/core';
+
+const NativeDeviceShell = registerPlugin('DeviceShell');
+
 export async function setDeviceOrientation(orientation) {
+  try {
+    await NativeDeviceShell.setOrientation({ orientation });
+    return true;
+  } catch {
+    // Fall back to the browser API for web/PWA builds.
+  }
+
   if (typeof screen === 'undefined' || !screen.orientation?.lock) return false;
 
   try {

@@ -3,190 +3,89 @@ import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import GameIcon from './ui/GameIcon';
 import './Controls.css';
 
+function bindJoystick(container, stick, state, setInput, onStart, onEnd) {
+  if (!container || !stick) return () => {};
+
+  const reset = () => {
+    if (!state.active) return;
+    state.active = false;
+    state.pointerId = null;
+    stick.classList.remove('active');
+    stick.style.transform = 'translate(-50%, -50%)';
+    setInput({ x: 0, y: 0 });
+    onEnd?.();
+  };
+
+  const update = (event) => {
+    if (!state.active || event.pointerId !== state.pointerId) return;
+    const rect = container.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    let deltaX = event.clientX - centerX;
+    let deltaY = event.clientY - centerY;
+    const maxDistance = Math.min(35, rect.width * 0.32);
+    const distance = Math.hypot(deltaX, deltaY);
+    if (distance > maxDistance) {
+      deltaX = (deltaX / distance) * maxDistance;
+      deltaY = (deltaY / distance) * maxDistance;
+    }
+    stick.style.transform = `translate(calc(-50% + ${deltaX}px), calc(-50% + ${deltaY}px))`;
+    setInput({ x: deltaX / maxDistance, y: deltaY / maxDistance });
+  };
+
+  const handlePointerDown = (event) => {
+    if (!event.isPrimary || state.active) return;
+    event.preventDefault();
+    state.active = true;
+    state.pointerId = event.pointerId;
+    container.setPointerCapture?.(event.pointerId);
+    stick.classList.add('active');
+    onStart?.();
+    update(event);
+  };
+  const handlePointerMove = (event) => { if (state.active) { event.preventDefault(); update(event); } };
+  const handlePointerEnd = (event) => { if (event.pointerId === state.pointerId) reset(); };
+
+  container.addEventListener('pointerdown', handlePointerDown, { passive: false });
+  container.addEventListener('pointermove', handlePointerMove, { passive: false });
+  container.addEventListener('pointerup', handlePointerEnd);
+  container.addEventListener('pointercancel', handlePointerEnd);
+  container.addEventListener('lostpointercapture', reset);
+  return () => {
+    reset();
+    container.removeEventListener('pointerdown', handlePointerDown);
+    container.removeEventListener('pointermove', handlePointerMove);
+    container.removeEventListener('pointerup', handlePointerEnd);
+    container.removeEventListener('pointercancel', handlePointerEnd);
+    container.removeEventListener('lostpointercapture', reset);
+  };
+}
+
 export default function Controls({ performDash, wasdKeys, togglePause }) {
   const joystickRef = useRef(null);
   const stickRef = useRef(null);
-  const joystickActive = useRef(false);
-  const joystickId = useRef(null);
-
+  const joystickState = useRef({ active: false, pointerId: null });
   const aimJoystickRef = useRef(null);
   const aimStickRef = useRef(null);
-  const aimJoystickActive = useRef(false);
-  const aimJoystickId = useRef(null);
-
-  // Detect if device has touch capability
-  useEffect(() => {
-    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-    const desktopControls = document.getElementById('desktop-wasd-controls');
-    const mobileControls = document.getElementById('mobile-controls');
-
-    if (isTouchDevice) {
-      if (desktopControls) desktopControls.style.display = 'none';
-      if (mobileControls) mobileControls.style.display = 'block';
-    } else {
-      if (desktopControls) desktopControls.style.display = 'block';
-      if (mobileControls) mobileControls.style.display = 'none';
-    }
-  }, []);
+  const aimState = useRef({ active: false, pointerId: null });
 
   useEffect(() => {
-    const joystickContainer = joystickRef.current;
-    const stick = stickRef.current;
-
-    if (!joystickContainer || !stick) return;
-
-    const handleTouchStart = (e) => {
-      const touch = Array.from(e.changedTouches).find((t) => {
-        const rect = joystickContainer.getBoundingClientRect();
-        return (
-          t.clientX >= rect.left &&
-          t.clientX <= rect.right &&
-          t.clientY >= rect.top &&
-          t.clientY <= rect.bottom
-        );
-      });
-
-      if (touch) {
-        e.preventDefault();
-        joystickActive.current = true;
-        joystickId.current = touch.identifier;
-        stick.classList.add('active');
-        updateJoystick(touch);
-      }
+    const cleanMove = bindJoystick(joystickRef.current, stickRef.current, joystickState, (input) => { window.joystickInput = input; });
+    const cleanAim = bindJoystick(aimJoystickRef.current, aimStickRef.current, aimState, (input) => { window.aimJoystickInput = input; }, () => { window.mobileFireActive = true; }, () => { window.mobileFireActive = false; });
+    const resetAll = () => {
+      joystickState.current.active = false;
+      aimState.current.active = false;
+      stickRef.current?.classList.remove('active');
+      aimStickRef.current?.classList.remove('active');
+      if (stickRef.current) stickRef.current.style.transform = 'translate(-50%, -50%)';
+      if (aimStickRef.current) aimStickRef.current.style.transform = 'translate(-50%, -50%)';
+      window.joystickInput = { x: 0, y: 0 };
+      window.aimJoystickInput = { x: 0, y: 0 };
+      window.mobileFireActive = false;
     };
-
-    const handleTouchMove = (e) => {
-      if (!joystickActive.current) return;
-
-      const touch = Array.from(e.changedTouches).find((t) => t.identifier === joystickId.current);
-      if (touch) {
-        e.preventDefault();
-        updateJoystick(touch);
-      }
-    };
-
-    const handleTouchEnd = (e) => {
-      const touch = Array.from(e.changedTouches).find((t) => t.identifier === joystickId.current);
-      if (touch) {
-        e.preventDefault();
-        joystickActive.current = false;
-        joystickId.current = null;
-        stick.classList.remove('active');
-        stick.style.transform = 'translate(-50%, -50%)';
-
-        window.joystickInput = { x: 0, y: 0 };
-      }
-    };
-
-    const updateJoystick = (touch) => {
-      const rect = joystickContainer.getBoundingClientRect();
-      const centerX = rect.left + rect.width / 2;
-      const centerY = rect.top + rect.height / 2;
-
-      let deltaX = touch.clientX - centerX;
-      let deltaY = touch.clientY - centerY;
-
-      const maxDistance = 35;
-      const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-
-      if (distance > maxDistance) {
-        deltaX = (deltaX / distance) * maxDistance;
-        deltaY = (deltaY / distance) * maxDistance;
-      }
-
-      stick.style.transform = `translate(calc(-50% + ${deltaX}px), calc(-50% + ${deltaY}px))`;
-
-      window.joystickInput = {
-        x: deltaX / maxDistance,
-        y: deltaY / maxDistance,
-      };
-    };
-
-    joystickContainer.addEventListener('touchstart', handleTouchStart, { passive: false });
-    document.addEventListener('touchmove', handleTouchMove, { passive: false });
-    document.addEventListener('touchend', handleTouchEnd, { passive: false });
-
-    // Right Joystick (Aiming)
-    const aimJoystickContainer = aimJoystickRef.current;
-    const aimStick = aimStickRef.current;
-    
-    if (!aimJoystickContainer || !aimStick) return;
-
-    const handleAimTouchStart = (e) => {
-      const touch = Array.from(e.changedTouches).find((t) => {
-        const rect = aimJoystickContainer.getBoundingClientRect();
-        return (
-          t.clientX >= rect.left &&
-          t.clientX <= rect.right &&
-          t.clientY >= rect.top &&
-          t.clientY <= rect.bottom
-        );
-      });
-
-      if (touch) {
-        e.preventDefault();
-        aimJoystickActive.current = true;
-        aimJoystickId.current = touch.identifier;
-        aimStick.classList.add('active');
-        window.mobileFireActive = true; // start firing
-        updateAimJoystick(touch);
-      }
-    };
-
-    const handleAimTouchMove = (e) => {
-      if (!aimJoystickActive.current) return;
-      const touch = Array.from(e.changedTouches).find((t) => t.identifier === aimJoystickId.current);
-      if (touch) {
-        e.preventDefault();
-        updateAimJoystick(touch);
-      }
-    };
-
-    const handleAimTouchEnd = (e) => {
-      const touch = Array.from(e.changedTouches).find((t) => t.identifier === aimJoystickId.current);
-      if (touch) {
-        e.preventDefault();
-        aimJoystickActive.current = false;
-        aimJoystickId.current = null;
-        aimStick.classList.remove('active');
-        aimStick.style.transform = 'translate(-50%, -50%)';
-        window.aimJoystickInput = { x: 0, y: 0 };
-        window.mobileFireActive = false; // stop firing
-      }
-    };
-
-    const updateAimJoystick = (touch) => {
-      const rect = aimJoystickContainer.getBoundingClientRect();
-      const centerX = rect.left + rect.width / 2;
-      const centerY = rect.top + rect.height / 2;
-      let deltaX = touch.clientX - centerX;
-      let deltaY = touch.clientY - centerY;
-      const maxDistance = 35;
-      const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-      if (distance > maxDistance) {
-        deltaX = (deltaX / distance) * maxDistance;
-        deltaY = (deltaY / distance) * maxDistance;
-      }
-      aimStick.style.transform = `translate(calc(-50% + ${deltaX}px), calc(-50% + ${deltaY}px))`;
-      window.aimJoystickInput = {
-        x: deltaX / maxDistance,
-        y: deltaY / maxDistance,
-      };
-    };
-
-    aimJoystickContainer.addEventListener('touchstart', handleAimTouchStart, { passive: false });
-    document.addEventListener('touchmove', handleAimTouchMove, { passive: false });
-    document.addEventListener('touchend', handleAimTouchEnd, { passive: false });
-
-    return () => {
-      joystickContainer.removeEventListener('touchstart', handleTouchStart);
-      document.removeEventListener('touchmove', handleTouchMove);
-      document.removeEventListener('touchend', handleTouchEnd);
-      
-      aimJoystickContainer.removeEventListener('touchstart', handleAimTouchStart);
-      document.removeEventListener('touchmove', handleAimTouchMove);
-      document.removeEventListener('touchend', handleAimTouchEnd);
-    };
+    window.addEventListener('blur', resetAll);
+    document.addEventListener('visibilitychange', resetAll);
+    return () => { cleanMove(); cleanAim(); resetAll(); window.removeEventListener('blur', resetAll); document.removeEventListener('visibilitychange', resetAll); };
   }, []);
 
   const handleDashClick = () => {
@@ -198,79 +97,8 @@ export default function Controls({ performDash, wasdKeys, togglePause }) {
     }
   };
 
-  const handlePauseClick = () => {
-    if (togglePause) {
-      togglePause();
-    }
-  };
-
-  return (
-    <>
-      {/* Desktop WASD Controls */}
-      <div id="desktop-wasd-controls">
-        <div className="wasd-container">
-          <div className="wasd-main">
-            <div className="wasd-row">
-              <div
-                className={`wasd-key ${wasdKeys.has('KeyW') || wasdKeys.has('ArrowUp') ? 'active' : ''}`}
-                data-key="KeyW"
-              >
-                W
-              </div>
-            </div>
-            <div className="wasd-row">
-              <div
-                className={`wasd-key ${wasdKeys.has('KeyA') || wasdKeys.has('ArrowLeft') ? 'active' : ''}`}
-                data-key="KeyA"
-              >
-                A
-              </div>
-              <div
-                className={`wasd-key ${wasdKeys.has('KeyS') || wasdKeys.has('ArrowDown') ? 'active' : ''}`}
-                data-key="KeyS"
-              >
-                S
-              </div>
-              <div
-                className={`wasd-key ${wasdKeys.has('KeyD') || wasdKeys.has('ArrowRight') ? 'active' : ''}`}
-                data-key="KeyD"
-              >
-                D
-              </div>
-            </div>
-          </div>
-          <div className="wasd-vertical">
-            <div
-              className={`wasd-key spacebar-key ${wasdKeys.has('Space') ? 'active' : ''}`}
-              data-key="Space"
-            >
-              SPACE
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Mobile Controls */}
-      <div id="mobile-controls">
-        <div id="joystick-container" ref={joystickRef}>
-          <div id="joystick-base"><span className="control-label">MOVE</span></div>
-          <div id="joystick-stick" ref={stickRef}></div>
-        </div>
-        <div id="joystick-container-right" ref={aimJoystickRef}>
-          <div id="joystick-base-right"><span className="control-label">FIRE</span></div>
-          <div id="joystick-stick-right" ref={aimStickRef}></div>
-        </div>
-        
-        <div className="mobile-action-buttons">
-          <button id="mobile-pause" onPointerDown={handlePauseClick} title="Pause" aria-label="Pause game">
-            <GameIcon name="pause" size={25} strokeWidth={2.4} />
-          </button>
-          <button id="mobile-dash" onPointerDown={handleDashClick} title="Dash" aria-label="Dash">
-            <GameIcon name="zap" size={33} strokeWidth={1.8} />
-            <span className="action-label">DASH</span>
-          </button>
-        </div>
-      </div>
-    </>
-  );
+  return <>
+    <div id="desktop-wasd-controls"><div className="wasd-container"><div className="wasd-main"><div className="wasd-row"><div className={`wasd-key ${wasdKeys.has('KeyW') || wasdKeys.has('ArrowUp') ? 'active' : ''}`}>W</div></div><div className="wasd-row"><div className={`wasd-key ${wasdKeys.has('KeyA') || wasdKeys.has('ArrowLeft') ? 'active' : ''}`}>A</div><div className={`wasd-key ${wasdKeys.has('KeyS') || wasdKeys.has('ArrowDown') ? 'active' : ''}`}>S</div><div className={`wasd-key ${wasdKeys.has('KeyD') || wasdKeys.has('ArrowRight') ? 'active' : ''}`}>D</div></div></div><div className="wasd-vertical"><div className={`wasd-key spacebar-key ${wasdKeys.has('Space') ? 'active' : ''}`}>SPACE</div></div></div></div>
+    <div id="mobile-controls"><div id="joystick-container" ref={joystickRef}><div id="joystick-base"><span className="control-label">MOVE</span></div><div id="joystick-stick" ref={stickRef} /></div><div id="joystick-container-right" ref={aimJoystickRef}><div id="joystick-base-right"><span className="control-label">FIRE</span></div><div id="joystick-stick-right" ref={aimStickRef} /></div><div className="mobile-action-buttons"><button id="mobile-pause" onPointerDown={togglePause} title="Pause" aria-label="Pause game"><GameIcon name="pause" size={25} strokeWidth={2.4} /></button><button id="mobile-dash" onPointerDown={handleDashClick} title="Dash" aria-label="Dash"><GameIcon name="zap" size={33} strokeWidth={1.8} /><span className="action-label">DASH</span></button></div></div>
+  </>;
 }
