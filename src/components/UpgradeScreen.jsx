@@ -1,19 +1,12 @@
 import { useState } from 'react';
+import GameIcon from './ui/GameIcon';
+import OverlaySheet from './ui/OverlaySheet';
 import './UpgradeScreen.css';
 
-const meta = {
-  maxHealth: ['♥', 'SURVIVAL', 'green', 'MAX HEALTH +20'], damage: ['✦', 'OFFENSE', 'red', 'DAMAGE +15'],
-  fireRate: ['⚡', 'WEAPON', 'blue', 'FIRE RATE +40'], speed: ['↯', 'MOBILITY', 'green', 'MOVE SPEED +0.5'],
-  dashCooldown: ['◈', 'MOBILITY', 'gold', 'COOLDOWN -500MS'], piercing: ['◎', 'SPECIAL', 'purple', 'PIERCE +1 TARGET'],
-};
+const meta = { maxHealth: ['heart', 'SURVIVAL', 'secondary', 'MAX HEALTH +20'], damage: ['zap', 'OFFENSE', 'danger', 'DAMAGE +15'], fireRate: ['zap', 'WEAPON', 'primary', 'FIRE RATE +40'], speed: ['back', 'MOBILITY', 'secondary', 'MOVE SPEED +0.5'], dashCooldown: ['zap', 'MOBILITY', 'gold', 'COOLDOWN -500MS'], piercing: ['shield', 'SPECIAL', 'purple', 'PIERCE +1 TARGET'] };
 
 export default function UpgradeScreen({ upgrades, onSelectUpgrade }) {
   const [selected, setSelected] = useState(null);
   const choose = (key) => { setSelected(key); window.setTimeout(() => onSelectUpgrade(key), 320); };
-  return <div id="upgrade-screen" role="dialog" aria-modal="true" aria-labelledby="upgrade-title">
-    <p className="upgrade-kicker">BOSS DEFEATED</p><h2 id="upgrade-title">CHOOSE YOUR UPGRADE</h2><p className="upgrade-subtitle">Your power grows in the dark.</p>
-    <div id="upgrade-options">{upgrades.map((upgrade) => { const [icon, category, color, change] = meta[upgrade.key] || ['✦', 'UPGRADE', 'blue', upgrade.description.toUpperCase()]; return <button key={upgrade.key} className={`upgrade-card ${color} ${selected && selected !== upgrade.key ? 'dimmed' : ''} ${selected === upgrade.key ? 'selected' : ''}`} onClick={() => choose(upgrade.key)} disabled={Boolean(selected)}>
-      <span className="upgrade-icon">{icon}</span><span className="upgrade-category">{category}</span><span className="upgrade-name">{upgrade.name.replace(/^\S+\s/, '')}</span><span className="upgrade-description">{upgrade.description}</span><span className="upgrade-change">{change}</span><span className="upgrade-level">LEVEL {upgrade.currentLevel} → {upgrade.currentLevel + 1}</span>
-    </button>; })}</div>
-  </div>;
+  return <OverlaySheet title="Choose your upgrade" kicker="BOSS DEFEATED" className="upgrade-sheet"><p className="upgrade-subtitle">Your power grows in the dark.</p><div id="upgrade-options">{upgrades.map((upgrade) => { const [icon, category, color, change] = meta[upgrade.key] || ['zap', 'UPGRADE', 'primary', upgrade.description.toUpperCase()]; return <button key={upgrade.key} className={`upgrade-option upgrade-option--${color} ${selected && selected !== upgrade.key ? 'is-dimmed' : ''} ${selected === upgrade.key ? 'is-selected' : ''}`} onClick={() => choose(upgrade.key)} disabled={Boolean(selected)}><span className="upgrade-option__icon"><GameIcon name={icon} size={26} /></span><span className="upgrade-option__category">{category}</span><strong>{upgrade.name.replace(/^\S+\s/, '')}</strong><small>{upgrade.description}</small><em>{change}</em><span className="upgrade-option__level">LEVEL {upgrade.currentLevel} → {upgrade.currentLevel + 1}</span></button>; })}</div></OverlaySheet>;
 }
