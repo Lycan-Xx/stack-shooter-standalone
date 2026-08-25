@@ -1,0 +1,20 @@
+.icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: rgba(25, 28, 34, .72);
+  color: var(--text-muted);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: border-color 160ms ease, background 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.icon-button:hover,
+.icon-button:focus-visible { border-color: var(--blue); background: rgba(56, 94, 116, .4); color: var(--text); outline: none; }
+.icon-button:active { transform: scale(.96); }
+.icon-button--primary { color: var(--blue-bright); }
+.icon-button--danger { color: var(--red); }

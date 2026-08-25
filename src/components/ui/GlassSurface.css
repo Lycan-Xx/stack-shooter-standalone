@@ -1,0 +1,12 @@
+.glass-surface {
+  background: rgba(22, 27, 34, .72);
+  border: 1px solid rgba(135, 146, 154, .28);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .18);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.glass-surface--primary { border-color: rgba(142, 213, 255, .62); box-shadow: 0 0 14px rgba(142, 213, 255, .14); }
+.glass-surface--secondary { border-color: rgba(77, 224, 130, .62); box-shadow: 0 0 14px rgba(77, 224, 130, .14); }
+.glass-surface--danger { border-color: rgba(255, 180, 171, .62); box-shadow: 0 0 14px rgba(255, 180, 171, .14); }
