@@ -1,6 +1,12 @@
 :root {
   --game-bg: #080c12;
   --game-bg-secondary: #0d131c;
+  --surface-background: #10131a;
+  --surface-lowest: #0b0e14;
+  --surface-low: #191c22;
+  --surface: #1d2026;
+  --surface-high: #272a31;
+  --surface-highest: #32353c;
   --panel: rgba(12, 20, 30, 0.88);
   --panel-light: rgba(20, 31, 44, 0.88);
   --border: rgba(125, 190, 255, 0.25);
@@ -11,8 +17,10 @@
   --red-dark: #8e1625;
   --green: #58df8a;
   --gold: #f4b942;
+  --green-bright: #6dfe9c;
   --text: #edf3f8;
   --text-secondary: #99a7b4;
+  --text-muted: #bdc8d1;
   --danger: #ff4757;
   --font-display: 'Space Grotesk', 'Segoe UI', sans-serif;
   --font-body: 'Hanken Grotesk', 'Segoe UI', sans-serif;
@@ -20,6 +28,12 @@
   --radius-sm: 6px;
   --radius-md: 10px;
   --shadow-panel: 0 12px 40px rgba(0, 0, 0, 0.35), 0 0 24px rgba(103, 200, 255, 0.08);
+  --space-unit: 4px;
+  --mobile-gutter: 16px;
+  --safe-top: max(0px, env(safe-area-inset-top));
+  --safe-right: max(0px, env(safe-area-inset-right));
+  --safe-bottom: max(0px, env(safe-area-inset-bottom));
+  --safe-left: max(0px, env(safe-area-inset-left));
 }
 
 .game-panel {

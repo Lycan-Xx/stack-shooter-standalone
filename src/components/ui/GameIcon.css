@@ -1,0 +1,10 @@
+.game-icon,
+.game-mark {
+  display: block;
+  flex: 0 0 auto;
+  color: currentColor;
+}
+
+.game-icon {
+  overflow: visible;
+}
