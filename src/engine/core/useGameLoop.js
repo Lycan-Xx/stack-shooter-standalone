@@ -22,6 +22,17 @@ import wasmUrl from '../pkg/vampire_engine_bg.wasm?url';
 const EV_PLAYER_HURT = 1 << 0;
 const EV_GAME_OVER   = 1 << 1;
 
+function getCameraScale() {
+  return typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches ? 0.88 : 0.96;
+}
+
+function screenToWorldPoint(x, y, canvas) {
+  const scale = getCameraScale();
+  const offsetX = canvas.width * (1 - scale) / 2;
+  const offsetY = canvas.height * (1 - scale) / 2;
+  return { x: (x - offsetX) / scale, y: (y - offsetY) / scale };
+}
+
 function seededValue(index) {
   const value = Math.sin(index * 12.9898 + 78.233) * 43758.5453;
   return value - Math.floor(value);
@@ -677,6 +688,11 @@ export function useGameLoop(canvasRef) {
 
     drawEnvironment(ctx, canvas.width, canvas.height);
 
+    const cameraScale = getCameraScale();
+    ctx.save();
+    ctx.translate(canvas.width * (1 - cameraScale) / 2, canvas.height * (1 - cameraScale) / 2);
+    ctx.scale(cameraScale, cameraScale);
+
     e.build_render_buffers();
 
     const playerX = e.player_x();
@@ -853,6 +869,7 @@ export function useGameLoop(canvasRef) {
     // Ricochets (JS-side visual)
     ricochetEffectsRef.current.forEach(r => r.draw(ctx));
 
+    ctx.restore();
     drawAtmosphere(ctx, canvas.width, canvas.height);
   };
 
@@ -916,8 +933,9 @@ export function useGameLoop(canvasRef) {
     };
     const handleMouseMove = (e) => {
       const rect = canvas.getBoundingClientRect();
-      mouseRef.current.x = e.clientX - rect.left;
-      mouseRef.current.y = e.clientY - rect.top;
+      const point = screenToWorldPoint(e.clientX - rect.left, e.clientY - rect.top, canvas);
+      mouseRef.current.x = point.x;
+      mouseRef.current.y = point.y;
       const ch = document.getElementById('crosshair');
       if (ch) { ch.style.left = e.clientX + 'px'; ch.style.top = e.clientY + 'px'; }
     };
@@ -934,8 +952,9 @@ export function useGameLoop(canvasRef) {
         const onDash = tx >= dr.left && tx <= dr.right && ty >= dr.top && ty <= dr.bottom;
         if (!onJoy && !onDash) {
           const rect = canvas.getBoundingClientRect();
-          mouseRef.current.x = t.clientX - rect.left;
-          mouseRef.current.y = t.clientY - rect.top;
+          const point = screenToWorldPoint(t.clientX - rect.left, t.clientY - rect.top, canvas);
+          mouseRef.current.x = point.x;
+          mouseRef.current.y = point.y;
           mouseRef.current.down = true;
         }
       }
@@ -943,8 +962,9 @@ export function useGameLoop(canvasRef) {
     const handleTouchMove = (ev) => {
       const t = ev.touches[0];
       const rect = canvas.getBoundingClientRect();
-      mouseRef.current.x = t.clientX - rect.left;
-      mouseRef.current.y = t.clientY - rect.top;
+      const point = screenToWorldPoint(t.clientX - rect.left, t.clientY - rect.top, canvas);
+      mouseRef.current.x = point.x;
+      mouseRef.current.y = point.y;
     };
     const handleTouchEnd = (ev) => { if (ev.touches.length === 0) mouseRef.current.down = false; };
 
