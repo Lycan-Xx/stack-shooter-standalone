@@ -1,6 +1,5 @@
-import { useRef, useState } from 'react';
+import { useRef } from 'react';
 import { useGameLoop } from '../engine/core/useGameLoop';
-import { soundManager } from '../engine/systems/sound.js';
 import HUD from './HUD';
 import StartScreen from './StartScreen';
 import GameOver from './GameOver';
@@ -31,10 +30,10 @@ export default function Game() {
   } = useGameLoop(canvasRef);
 
   return (
-    <div id="game-container">
+    <div id="game-container" className={`game-shell game-shell--${gameState}`} data-game-state={gameState}>
       <canvas ref={canvasRef} id="game-canvas"></canvas>
 
-      <div id="ui-overlay">
+      <div id="ui-overlay" className="game-shell__overlay">
         {(gameState === 'playing' || gameState === 'tutorial') && (
           <>
             <HUD {...hudData} />
@@ -42,7 +41,7 @@ export default function Game() {
           </>
         )}
 
-        <div id="wave-info"></div>
+        <div id="wave-info" aria-live="polite"></div>
 
         {gameState === 'start' && (
           <StartScreen
@@ -83,7 +82,9 @@ export default function Game() {
 
       <div id="crosshair"></div>
 
-      <Controls performDash={performDash} wasdKeys={wasdKeys} togglePause={togglePause} />
+      {(gameState === 'playing' || gameState === 'tutorial') && (
+        <Controls performDash={performDash} wasdKeys={wasdKeys} togglePause={togglePause} />
+      )}
     </div>
   );
 }
