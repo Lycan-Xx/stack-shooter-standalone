@@ -1,5 +1,33 @@
 import './GameIcon.css';
 
+import { ArrowLeftIcon } from '@solar-icons/react/linear/arrow-left';
+import { BookIcon } from '@solar-icons/react/linear/book';
+import { BoltIcon } from '@solar-icons/react/linear/bolt';
+import { ChartIcon } from '@solar-icons/react/linear/chart';
+import { CloseIcon } from '@solar-icons/react/linear/close';
+import { CupIcon } from '@solar-icons/react/linear/cup';
+import { HeartIcon } from '@solar-icons/react/linear/heart';
+import { HomeIcon } from '@solar-icons/react/linear/home';
+import { InfoCircleIcon } from '@solar-icons/react/linear/info-circle';
+import { PauseIcon } from '@solar-icons/react/linear/pause';
+import { PlayIcon } from '@solar-icons/react/linear/play';
+import { PeopleNearbyIcon } from '@solar-icons/react/linear/people-nearby';
+
+const solarIcons = {
+  play: PlayIcon,
+  pause: PauseIcon,
+  back: ArrowLeftIcon,
+  close: CloseIcon,
+  tutorial: BookIcon,
+  trophy: CupIcon,
+  users: PeopleNearbyIcon,
+  home: HomeIcon,
+  zap: BoltIcon,
+  heart: HeartIcon,
+  info: InfoCircleIcon,
+  stats: ChartIcon,
+};
+
 const paths = {
   play: <><path d="M8 5.5 19 12 8 18.5Z" /><path d="M4.5 4.5v15" /></>,
   pause: <><path d="M8 5v14" /><path d="M16 5v14" /></>,
@@ -23,6 +51,19 @@ const paths = {
 };
 
 export default function GameIcon({ name, size = 24, strokeWidth = 1.7, label, className = '' }) {
+  const SolarIcon = solarIcons[name];
+  if (SolarIcon) {
+    return (
+      <SolarIcon
+        className={`game-icon ${className}`.trim()}
+        size={size}
+        strokeWidth={strokeWidth}
+        aria-hidden={label ? undefined : 'true'}
+        aria-label={label}
+      />
+    );
+  }
+
   const content = paths[name] || paths.info;
   return (
     <svg
