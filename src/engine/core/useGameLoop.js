@@ -9,6 +9,7 @@ import { DIFFICULTY } from '../logic/difficulty.js';
 import { RicochetEffect } from '../systems/svgCharacters.js';
 import { tutorialSteps } from '../logic/tutorial.js';
 import { getRandomUpgrades, applyUpgrade } from '../logic/upgrades.js';
+import { requestGameplayOrientation, requestLobbyOrientation } from '../systems/deviceShell.js';
 import { soundManager } from '../systems/sound.js';
 import { gameStorage } from '../systems/gameStorage.js';
 import { createSpriteRenderer } from '../systems/spriteRenderer.js';
@@ -362,6 +363,7 @@ export function useGameLoop(canvasRef) {
   const startGame = (selectedDifficulty, challengeData = null) => {
     const game = gameRef.current;
     soundManager.play('uiClick');
+    requestGameplayOrientation();
 
     if (challengeData) {
       game.difficulty = 'challenge';
@@ -403,6 +405,7 @@ export function useGameLoop(canvasRef) {
   const startTutorialMode = () => {
     const game = gameRef.current;
     soundManager.play('uiClick');
+    requestGameplayOrientation();
     game.state = 'tutorial';
     game.difficulty = 'tutorial';
     game.tutorialStep = 0;
@@ -506,6 +509,7 @@ export function useGameLoop(canvasRef) {
 
   const gameOver = () => {
     const game = gameRef.current;
+    requestLobbyOrientation();
     game.state = 'gameOver';
     setGameState('gameOver');
     soundManager.play('gameOver');
@@ -899,6 +903,12 @@ export function useGameLoop(canvasRef) {
         if (performDash()) e.preventDefault();
       }
     };
+    const handleBackButton = () => {
+      togglePause();
+    };
+    const handleSecondBackButton = () => {
+      window.dispatchEvent(new CustomEvent('app-exit-warning'));
+    };
     const handleKeyUp = (e) => {
       keysRef.current[e.key] = false;
       keysRef.current[e.key.toLowerCase()] = false;
@@ -943,6 +953,8 @@ export function useGameLoop(canvasRef) {
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mousedown', handleMouseDown);
     window.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('backbutton', handleBackButton);
+    document.addEventListener('backbuttonsecond', handleSecondBackButton);
     canvas.addEventListener('touchstart', handleTouchStart);
     canvas.addEventListener('touchmove', handleTouchMove);
     canvas.addEventListener('touchend', handleTouchEnd);
@@ -952,6 +964,8 @@ export function useGameLoop(canvasRef) {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mousedown', handleMouseDown);
       window.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('backbutton', handleBackButton);
+      document.removeEventListener('backbuttonsecond', handleSecondBackButton);
       canvas.removeEventListener('touchstart', handleTouchStart);
       canvas.removeEventListener('touchmove', handleTouchMove);
       canvas.removeEventListener('touchend', handleTouchEnd);

@@ -31,6 +31,22 @@
   pointer-events: auto;
 }
 
+.system-message {
+  position: fixed;
+  left: 50%;
+  bottom: calc(24px + var(--safe-bottom));
+  transform: translateX(-50%);
+  z-index: 3000;
+  max-width: min(90vw, 360px);
+  padding: 10px 14px;
+  border: 1px solid var(--border-strong);
+  background: rgba(16, 19, 26, .94);
+  color: var(--text);
+  font: 700 .78rem var(--font-tech);
+  text-align: center;
+  box-shadow: 0 8px 26px rgba(0, 0, 0, .4);
+}
+
 #crosshair {
   position: fixed;
   width: 20px;

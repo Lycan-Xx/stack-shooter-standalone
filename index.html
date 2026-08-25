@@ -14,14 +14,6 @@
 <body>
   <div id="root"></div>
   <script type="module" src="/src/main.jsx"></script>
-  <script>
-    // Force landscape orientation on mobile
-    if (typeof screen !== 'undefined' && screen.orientation) {
-      screen.orientation.lock('landscape').catch(() => {
-        // Fallback if lock fails (some browsers don't support this)
-      });
-    }
-  </script>
 </body>
 
 </html>

@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useGameLoop } from '../engine/core/useGameLoop';
 import HUD from './HUD';
 import StartScreen from './StartScreen';
@@ -11,6 +11,7 @@ import './Game.css';
 
 export default function Game() {
   const canvasRef = useRef(null);
+  const [exitHint, setExitHint] = useState(false);
 
   const {
     gameState,
@@ -29,11 +30,21 @@ export default function Game() {
     togglePause,
   } = useGameLoop(canvasRef);
 
+  useEffect(() => {
+    const showExitHint = () => {
+      setExitHint(true);
+      window.setTimeout(() => setExitHint(false), 2200);
+    };
+    window.addEventListener('app-exit-warning', showExitHint);
+    return () => window.removeEventListener('app-exit-warning', showExitHint);
+  }, []);
+
   return (
     <div id="game-container" className={`game-shell game-shell--${gameState}`} data-game-state={gameState}>
       <canvas ref={canvasRef} id="game-canvas"></canvas>
 
       <div id="ui-overlay" className="game-shell__overlay">
+        {exitHint && <div className="system-message" role="status">Press back again to exit Stack Shooter</div>}
         {(gameState === 'playing' || gameState === 'tutorial') && (
           <>
             <HUD {...hudData} />
