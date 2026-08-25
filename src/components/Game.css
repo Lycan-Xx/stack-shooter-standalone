@@ -47,17 +47,6 @@
   box-shadow: 0 8px 26px rgba(0, 0, 0, .4);
 }
 
-#crosshair {
-  position: fixed;
-  width: 20px;
-  height: 20px;
-  border: 2px solid rgba(255, 255, 255, 0.8);
-  border-radius: 50%;
-  pointer-events: none;
-  transform: translate(-50%, -50%);
-  z-index: 9999;
-}
-
 .game-shell--start,
 .game-shell--gameOver {
   background: var(--surface-background);
@@ -74,95 +63,20 @@
   background: var(--game-bg);
 }
 
-#crosshair::before,
-#crosshair::after {
-  content: '';
-  position: absolute;
-  background: rgba(255, 255, 255, 0.8);
-}
-
-#crosshair::before {
-  width: 2px;
-  height: 10px;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-}
-
-#crosshair::after {
-  width: 10px;
-  height: 2px;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-}
-
 #wave-info {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  font-size: 48px;
-  font-weight: bold;
-  color: #fff;
-  text-shadow: 0 0 20px #ff0000;
+  padding: 10px 16px;
+  border: 1px solid var(--blue);
+  background: rgba(16, 19, 26, .86);
+  color: var(--blue-bright);
+  font: 700 1.1rem var(--font-tech);
+  letter-spacing: .08em;
   opacity: 0;
   transition: opacity 0.3s;
   pointer-events: none;
   z-index: 100;
 }
 
-#difficulty-badge {
-  position: absolute;
-  top: 20px;
-  left: 260px;
-  padding: 8px 16px;
-  background: rgba(0, 0, 0, 0.7);
-  border: 2px solid #ffaa00;
-  border-radius: 8px;
-  color: #ffaa00;
-  font-weight: bold;
-  font-size: 14px;
-  z-index: 10;
-}
-
-/* Landscape orientation for mobile */
-@media (orientation: landscape) {
-  #game-container {
-    height: 100dvh;
-  }
-
-  #difficulty-badge {
-    top: 10px;
-    left: 10px;
-    font-size: 12px;
-    padding: 5px 10px;
-  }
-
-  #wave-info {
-    font-size: 36px;
-  }
-}
-
-/* Portrait orientation fallback */
-@media (orientation: portrait) {
-  #game-container {
-    height: 100dvh;
-  }
-
-  #difficulty-badge {
-    top: 10px;
-    left: 10px;
-    font-size: 12px;
-    padding: 6px 12px;
-  }
-}
-
-@media (max-width: 768px) {
-  #difficulty-badge {
-    top: 10px;
-    left: 10px;
-    font-size: 12px;
-    padding: 6px 12px;
-  }
-}

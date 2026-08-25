@@ -124,7 +124,6 @@ export function useGameLoop(canvasRef) {
     dashCooldown: 0, maxDashCooldown: 4000,
   });
   const [difficulty, setDifficulty] = useState('normal');
-  const [difficultyBadge, setDifficultyBadge] = useState('😐 NORMAL MODE');
   const [upgradeOptions, setUpgradeOptions] = useState([]);
   const [tutorialText, setTutorialText] = useState('');
   const [wasdKeys, setWasdKeys] = useState(new Set());
@@ -380,18 +379,10 @@ export function useGameLoop(canvasRef) {
       game.difficulty = 'challenge';
       game.challengeData = challengeData;
       setDifficulty('challenge');
-      setDifficultyBadge(`📅 ${challengeData.name.toUpperCase()}`);
     } else {
       game.difficulty = selectedDifficulty;
       game.challengeData = null;
       setDifficulty(selectedDifficulty);
-      const badges = {
-        easy: '😊 EASY MODE',
-        normal: '😐 NORMAL MODE',
-        hard: '😰 HARD MODE',
-        nightmare: '💀 NIGHTMARE MODE',
-      };
-      setDifficultyBadge(badges[selectedDifficulty]);
     }
 
     // Load saved settings
@@ -422,7 +413,6 @@ export function useGameLoop(canvasRef) {
     game.tutorialStep = 0;
     setGameState('tutorial');
     setDifficulty('tutorial');
-    setDifficultyBadge('📚 TUTORIAL');
     initGame();
     soundManager.playMusic();
     setTutorialText(tutorialSteps[0].text);
@@ -442,7 +432,6 @@ export function useGameLoop(canvasRef) {
       game.waveInProgress = false;
       game.waitingForNextWave = false;
       setDifficulty('easy');
-      setDifficultyBadge('😊 EASY MODE');
       const diff = DIFFICULTY['easy'];
       e.set_player_stats(diff.playerHealth, diff.playerSpeed,
         diff.dashCooldown, diff.fireRate, diff.playerDamage, 0);
@@ -936,8 +925,6 @@ export function useGameLoop(canvasRef) {
       const point = screenToWorldPoint(e.clientX - rect.left, e.clientY - rect.top, canvas);
       mouseRef.current.x = point.x;
       mouseRef.current.y = point.y;
-      const ch = document.getElementById('crosshair');
-      if (ch) { ch.style.left = e.clientX + 'px'; ch.style.top = e.clientY + 'px'; }
     };
     const handleMouseDown = () => { mouseRef.current.down = true; };
     const handleMouseUp = () => { mouseRef.current.down = false; };
@@ -993,7 +980,7 @@ export function useGameLoop(canvasRef) {
   }, []);
 
   return {
-    gameState, hudData, difficulty, difficultyBadge,
+    gameState, hudData, difficulty,
     upgradeOptions, tutorialText, wasdKeys, isPaused,
     startGame, startTutorialMode, continTutorial, restartGame,
     selectUpgrade, performDash, togglePause,

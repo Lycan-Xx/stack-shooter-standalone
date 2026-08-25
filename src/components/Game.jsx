@@ -16,7 +16,6 @@ export default function Game() {
   const {
     gameState,
     hudData,
-    difficultyBadge,
     upgradeOptions,
     tutorialText,
     wasdKeys,
@@ -48,7 +47,6 @@ export default function Game() {
         {(gameState === 'playing' || gameState === 'tutorial') && (
           <>
             <HUD {...hudData} />
-            <div id="difficulty-badge">{difficultyBadge}</div>
           </>
         )}
 
@@ -90,8 +88,6 @@ export default function Game() {
           />
         )}
       </div>
-
-      <div id="crosshair"></div>
 
       {(gameState === 'playing' || gameState === 'tutorial') && (
         <Controls performDash={performDash} wasdKeys={wasdKeys} togglePause={togglePause} />
