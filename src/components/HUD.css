@@ -1,6 +1,6 @@
 #hud { position: absolute; inset: 0; z-index: 10; pointer-events: none; color: var(--text); font-family: var(--font-tech); }
 .hud-cluster { position: absolute; }
-.hud-vitals { top: max(18px, env(safe-area-inset-top)); left: clamp(88px, 15vw, 240px); display: flex; gap: clamp(12px, 2.5vw, 42px); }
+.hud-vitals { top: calc(14px + var(--safe-top)); left: 50%; transform: translateX(-50%); display: flex; gap: clamp(12px, 2.5vw, 42px); }
 .hud-meter { width: clamp(150px, 18vw, 250px); }
 .hud-meter-heading, .hud-wave-label, .hud-enemies, .hud-secondary-stats { font-size: 10px; font-weight: 700; letter-spacing: .14em; }
 .hud-meter-heading { color: var(--text-secondary); margin-bottom: 6px; }
@@ -14,7 +14,7 @@
 .hud-meter-value span { color: var(--text-secondary); font-weight: 400; }
 .hud-health.is-critical { animation: hud-critical-pulse 1.5s ease-in-out infinite; }
 @keyframes hud-critical-pulse { 0%, 100% { filter: none; } 50% { filter: drop-shadow(0 0 7px rgba(255, 63, 79, .55)); } }
-.hud-run-info { top: max(18px, env(safe-area-inset-top)); right: max(20px, env(safe-area-inset-right)); min-width: 140px; text-align: right; }
+.hud-run-info { top: calc(14px + var(--safe-top)); right: calc(14px + var(--safe-right)); min-width: 140px; text-align: right; }
 .hud-score { color: var(--blue-bright); font: 700 clamp(20px, 2.4vw, 32px) var(--font-display); text-shadow: 0 0 14px rgba(103, 200, 255, .3); }
 .hud-wave-label { margin-top: 2px; color: var(--text-secondary); }
 .hud-wave-label strong { color: var(--text); font-size: 14px; }
@@ -28,15 +28,15 @@
 #powerup-indicators { position: absolute; top: 110px; right: 20px; display: flex; gap: 8px; }
 .powerup-indicator { display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--panel); color: var(--blue-bright); }
 @media (max-width: 768px) {
-  .hud-vitals { left: 76px; gap: 10px; }
+  .hud-vitals { gap: 10px; }
   .hud-meter { width: clamp(115px, 25vw, 180px); }
-  .hud-run-info { right: 14px; }
+  .hud-run-info { right: calc(10px + var(--safe-right)); }
   .hud-secondary-stats { display: none; }
   #powerup-indicators { top: 102px; right: 14px; }
 }
 @media (max-width: 520px) {
-  .hud-vitals { left: 14px; top: 76px; }
-  .hud-run-info { top: 14px; }
+  .hud-vitals { top: calc(68px + var(--safe-top)); }
+  .hud-run-info { top: calc(10px + var(--safe-top)); }
   .hud-meter { width: 130px; }
 }
 @media (prefers-reduced-motion: reduce) { .hud-health.is-critical { animation: none; } }
