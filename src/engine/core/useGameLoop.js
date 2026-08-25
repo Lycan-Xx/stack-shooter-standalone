@@ -9,6 +9,7 @@ import { DIFFICULTY } from '../logic/difficulty.js';
 import { RicochetEffect } from '../systems/svgCharacters.js';
 import { tutorialSteps } from '../logic/tutorial.js';
 import { getRandomUpgrades, applyUpgrade } from '../logic/upgrades.js';
+import { requestGameplayOrientation, requestLobbyOrientation } from '../systems/deviceShell.js';
 import { soundManager } from '../systems/sound.js';
 import { gameStorage } from '../systems/gameStorage.js';
 import { createSpriteRenderer } from '../systems/spriteRenderer.js';
@@ -20,6 +21,17 @@ import wasmUrl from '../pkg/vampire_engine_bg.wasm?url';
 // Engine-side bit flags (must mirror lib.rs)
 const EV_PLAYER_HURT = 1 << 0;
 const EV_GAME_OVER   = 1 << 1;
+
+function getCameraScale() {
+  return typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches ? 0.88 : 0.96;
+}
+
+function screenToWorldPoint(x, y, canvas) {
+  const scale = getCameraScale();
+  const offsetX = canvas.width * (1 - scale) / 2;
+  const offsetY = canvas.height * (1 - scale) / 2;
+  return { x: (x - offsetX) / scale, y: (y - offsetY) / scale };
+}
 
 function seededValue(index) {
   const value = Math.sin(index * 12.9898 + 78.233) * 43758.5453;
@@ -112,7 +124,6 @@ export function useGameLoop(canvasRef) {
     dashCooldown: 0, maxDashCooldown: 4000,
   });
   const [difficulty, setDifficulty] = useState('normal');
-  const [difficultyBadge, setDifficultyBadge] = useState('😐 NORMAL MODE');
   const [upgradeOptions, setUpgradeOptions] = useState([]);
   const [tutorialText, setTutorialText] = useState('');
   const [wasdKeys, setWasdKeys] = useState(new Set());
@@ -362,23 +373,16 @@ export function useGameLoop(canvasRef) {
   const startGame = (selectedDifficulty, challengeData = null) => {
     const game = gameRef.current;
     soundManager.play('uiClick');
+    requestGameplayOrientation();
 
     if (challengeData) {
       game.difficulty = 'challenge';
       game.challengeData = challengeData;
       setDifficulty('challenge');
-      setDifficultyBadge(`📅 ${challengeData.name.toUpperCase()}`);
     } else {
       game.difficulty = selectedDifficulty;
       game.challengeData = null;
       setDifficulty(selectedDifficulty);
-      const badges = {
-        easy: '😊 EASY MODE',
-        normal: '😐 NORMAL MODE',
-        hard: '😰 HARD MODE',
-        nightmare: '💀 NIGHTMARE MODE',
-      };
-      setDifficultyBadge(badges[selectedDifficulty]);
     }
 
     // Load saved settings
@@ -403,12 +407,12 @@ export function useGameLoop(canvasRef) {
   const startTutorialMode = () => {
     const game = gameRef.current;
     soundManager.play('uiClick');
+    requestGameplayOrientation();
     game.state = 'tutorial';
     game.difficulty = 'tutorial';
     game.tutorialStep = 0;
     setGameState('tutorial');
     setDifficulty('tutorial');
-    setDifficultyBadge('📚 TUTORIAL');
     initGame();
     soundManager.playMusic();
     setTutorialText(tutorialSteps[0].text);
@@ -428,7 +432,6 @@ export function useGameLoop(canvasRef) {
       game.waveInProgress = false;
       game.waitingForNextWave = false;
       setDifficulty('easy');
-      setDifficultyBadge('😊 EASY MODE');
       const diff = DIFFICULTY['easy'];
       e.set_player_stats(diff.playerHealth, diff.playerSpeed,
         diff.dashCooldown, diff.fireRate, diff.playerDamage, 0);
@@ -506,6 +509,7 @@ export function useGameLoop(canvasRef) {
 
   const gameOver = () => {
     const game = gameRef.current;
+    requestLobbyOrientation();
     game.state = 'gameOver';
     setGameState('gameOver');
     soundManager.play('gameOver');
@@ -672,6 +676,11 @@ export function useGameLoop(canvasRef) {
     if (game.state !== 'playing' && game.state !== 'tutorial') return;
 
     drawEnvironment(ctx, canvas.width, canvas.height);
+
+    const cameraScale = getCameraScale();
+    ctx.save();
+    ctx.translate(canvas.width * (1 - cameraScale) / 2, canvas.height * (1 - cameraScale) / 2);
+    ctx.scale(cameraScale, cameraScale);
 
     e.build_render_buffers();
 
@@ -849,6 +858,7 @@ export function useGameLoop(canvasRef) {
     // Ricochets (JS-side visual)
     ricochetEffectsRef.current.forEach(r => r.draw(ctx));
 
+    ctx.restore();
     drawAtmosphere(ctx, canvas.width, canvas.height);
   };
 
@@ -899,6 +909,12 @@ export function useGameLoop(canvasRef) {
         if (performDash()) e.preventDefault();
       }
     };
+    const handleBackButton = () => {
+      togglePause();
+    };
+    const handleSecondBackButton = () => {
+      window.dispatchEvent(new CustomEvent('app-exit-warning'));
+    };
     const handleKeyUp = (e) => {
       keysRef.current[e.key] = false;
       keysRef.current[e.key.toLowerCase()] = false;
@@ -906,10 +922,9 @@ export function useGameLoop(canvasRef) {
     };
     const handleMouseMove = (e) => {
       const rect = canvas.getBoundingClientRect();
-      mouseRef.current.x = e.clientX - rect.left;
-      mouseRef.current.y = e.clientY - rect.top;
-      const ch = document.getElementById('crosshair');
-      if (ch) { ch.style.left = e.clientX + 'px'; ch.style.top = e.clientY + 'px'; }
+      const point = screenToWorldPoint(e.clientX - rect.left, e.clientY - rect.top, canvas);
+      mouseRef.current.x = point.x;
+      mouseRef.current.y = point.y;
     };
     const handleMouseDown = () => { mouseRef.current.down = true; };
     const handleMouseUp = () => { mouseRef.current.down = false; };
@@ -924,8 +939,9 @@ export function useGameLoop(canvasRef) {
         const onDash = tx >= dr.left && tx <= dr.right && ty >= dr.top && ty <= dr.bottom;
         if (!onJoy && !onDash) {
           const rect = canvas.getBoundingClientRect();
-          mouseRef.current.x = t.clientX - rect.left;
-          mouseRef.current.y = t.clientY - rect.top;
+          const point = screenToWorldPoint(t.clientX - rect.left, t.clientY - rect.top, canvas);
+          mouseRef.current.x = point.x;
+          mouseRef.current.y = point.y;
           mouseRef.current.down = true;
         }
       }
@@ -933,8 +949,9 @@ export function useGameLoop(canvasRef) {
     const handleTouchMove = (ev) => {
       const t = ev.touches[0];
       const rect = canvas.getBoundingClientRect();
-      mouseRef.current.x = t.clientX - rect.left;
-      mouseRef.current.y = t.clientY - rect.top;
+      const point = screenToWorldPoint(t.clientX - rect.left, t.clientY - rect.top, canvas);
+      mouseRef.current.x = point.x;
+      mouseRef.current.y = point.y;
     };
     const handleTouchEnd = (ev) => { if (ev.touches.length === 0) mouseRef.current.down = false; };
 
@@ -943,6 +960,8 @@ export function useGameLoop(canvasRef) {
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mousedown', handleMouseDown);
     window.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('backbutton', handleBackButton);
+    document.addEventListener('backbuttonsecond', handleSecondBackButton);
     canvas.addEventListener('touchstart', handleTouchStart);
     canvas.addEventListener('touchmove', handleTouchMove);
     canvas.addEventListener('touchend', handleTouchEnd);
@@ -952,6 +971,8 @@ export function useGameLoop(canvasRef) {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mousedown', handleMouseDown);
       window.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('backbutton', handleBackButton);
+      document.removeEventListener('backbuttonsecond', handleSecondBackButton);
       canvas.removeEventListener('touchstart', handleTouchStart);
       canvas.removeEventListener('touchmove', handleTouchMove);
       canvas.removeEventListener('touchend', handleTouchEnd);
@@ -959,7 +980,7 @@ export function useGameLoop(canvasRef) {
   }, []);
 
   return {
-    gameState, hudData, difficulty, difficultyBadge,
+    gameState, hudData, difficulty,
     upgradeOptions, tutorialText, wasdKeys, isPaused,
     startGame, startTutorialMode, continTutorial, restartGame,
     selectUpgrade, performDash, togglePause,

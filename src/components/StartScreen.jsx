@@ -1,190 +1,49 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import DifficultySelect from './DifficultySelect';
 import { getHighScores, getBestWave, gameStorage } from '../engine/systems/gameStorage.js';
+import GameButton from './ui/GameButton';
+import GlassSurface from './ui/GlassSurface';
+import IconButton from './ui/IconButton';
+import GameIcon, { GameMark } from './ui/GameIcon';
+import OverlaySheet from './ui/OverlaySheet';
+import StatRow from './ui/StatRow';
 import './StartScreen.css';
-import GamePanel from './ui/GamePanel';
+
+const difficulties = ['easy', 'normal', 'hard', 'nightmare'];
 
 export default function StartScreen({ onStartGame, onStartTutorial }) {
-  const [view, setView] = useState('main'); // main, difficulty
+  const [view, setView] = useState('main');
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [highScores, setHighScores] = useState({});
   const [profile, setProfile] = useState({ bestWave: 0, totalKills: 0, difficulty: 'normal' });
 
   useEffect(() => {
-    // Load high scores on mount
-    const difficulties = ['easy', 'normal', 'hard', 'nightmare'];
-    const scores = {};
-    difficulties.forEach(diff => {
-      scores[diff] = getHighScores(diff).slice(0, 3); // Top 3 per difficulty
-    });
-    setHighScores(scores);
+    const scores = Object.fromEntries(difficulties.map((difficulty) => [difficulty, getHighScores(difficulty).slice(0, 3)]));
     const settings = gameStorage.getSettings();
     const lifetime = gameStorage.getLifetimeStats();
+    setHighScores(scores);
     setProfile({ bestWave: Math.max(...difficulties.map(getBestWave)), totalKills: lifetime.totalKills, difficulty: settings.difficulty || 'normal' });
   }, []);
 
-  // Start Screen view
-
-  const formatNumber = (num) => {
-    if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
-    if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
-    return num.toString();
-  };
-
-  // Show difficulty select screen
   if (view === 'difficulty') {
-    return (
-      <DifficultySelect
-        onSelectDifficulty={(difficulty) => {
-          setView('main');
-          onStartGame(difficulty);
-        }}
-        onBack={() => setView('main')}
-      />
-    );
+    return <DifficultySelect onSelectDifficulty={(difficulty) => { setView('main'); onStartGame(difficulty); }} onBack={() => setView('main')} />;
   }
 
+  const formatNumber = (value) => value >= 1000000 ? `${(value / 1000000).toFixed(1)}M` : value >= 1000 ? `${(value / 1000).toFixed(1)}K` : value;
+  const hasScores = Object.values(highScores).some((scores) => scores.length > 0);
+
   return (
-    <>
-      <div id="start-screen">
-        <div className="header-section">
-          <p className="game-eyebrow">STACK SHOOTER</p>
-          <h1 className="game-title">🧛 Vampire Siege</h1>
-          <p className="game-description">
-            Defend against endless hordes of vampires in this intense top-down shooter! 
-            Survive waves, collect upgrades, and hold your ground against the undead!
-          </p>
-        </div>
-
-        <GamePanel className="player-summary"><div><span>BEST WAVE</span><strong>{profile.bestWave}</strong></div><div><span>TOTAL KILLS</span><strong>{formatNumber(profile.totalKills)}</strong></div><div><span>MODE</span><strong>{profile.difficulty.toUpperCase()}</strong></div></GamePanel>
-
-        {/* Main Menu Buttons */}
-        <div className="main-menu">
-          <button className="menu-btn primary" onClick={() => setView('difficulty')}>
-            <span className="btn-icon">🎮</span>
-            <span className="btn-text">Quick Start</span>
-            <span className="btn-subtitle">Choose your difficulty</span>
-          </button>
-
-          <button className="menu-btn tutorial" onClick={onStartTutorial}>
-            <span className="btn-icon">📚</span>
-            <span className="btn-text">Tutorial</span>
-            <span className="btn-subtitle">Learn the basics</span>
-          </button>
-
-          <button className="menu-btn info" onClick={() => setShowHowToPlay(true)}>
-            <span className="btn-icon">❓</span>
-            <span className="btn-text">How to Play</span>
-          </button>
-        </div>
-
-        {/* High Scores Display */}
-        {Object.values(highScores).some(scores => scores.length > 0) && (
-          <GamePanel className="high-scores-section">
-            <h3>🏆 Top Scores</h3>
-            <div className="high-scores-grid">
-              {['easy', 'normal', 'hard', 'nightmare'].map(difficulty => {
-                const scores = highScores[difficulty] || [];
-                const badges = { easy: '😊', normal: '😐', hard: '😰', nightmare: '💀' };
-                return (
-                  <div key={difficulty} className="high-scores-column">
-                    <div className="difficulty-header">
-                      <span className="badge">{badges[difficulty]}</span>
-                      <span className="label">{difficulty.toUpperCase()}</span>
-                    </div>
-                    {scores.length > 0 ? (
-                      <ol className="scores-list">
-                        {scores.map((score, idx) => (
-                          <li key={idx} className="score-entry">
-                            <span className="rank">#{idx + 1}</span>
-                            <span className="value">{score.score.toLocaleString()}</span>
-                          </li>
-                        ))}
-                      </ol>
-                    ) : (
-                      <p className="no-scores">No scores yet</p>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </GamePanel>
-        )}
-
-        {/* Controls Info */}
-        <div className="controls-section">
-          <div className="desktop-only">
-            <span className="controls-label">Controls:</span> WASD/Arrows • Mouse Aim • Click to Shoot • Space to Dash
-          </div>
-          <div className="mobile-only">
-            <span className="controls-label">Controls:</span> Joystick to Move • Tap to Shoot • Dash Button
-          </div>
-        </div>
+    <main id="start-screen" className="lobby-shell">
+      <header className="lobby-topbar"><div className="lobby-brand"><GameMark size={34} /><div><span className="lobby-brand__eyebrow">STACK SHOOTER</span><h1>Vampire Siege</h1></div></div><IconButton icon="settings" label="Settings" /></header>
+      <div className="lobby-content">
+        <GlassSurface className="profile-widget"><div className="profile-widget__heading"><div><p className="section-label">PLAYER PROFILE</p><h2>Slayer_01</h2><span>LEVEL 01 · PRE-ALPHA</span></div><GameIcon name="shield" size={30} /></div><div className="profile-widget__progress"><div><span>FIELD EXPERIENCE</span><strong>{profile.bestWave ? `WAVE ${profile.bestWave}` : 'READY FOR DEPLOYMENT'}</strong></div><div className="progress-track"><i style={{ width: `${Math.min(100, profile.bestWave * 8)}%` }} /></div></div></GlassSurface>
+        <GameButton variant="primary" className="quick-start" onClick={() => setView('difficulty')}><GameIcon name="play" size={24} /><span><strong>QUICK START</strong><small>Choose your difficulty</small></span></GameButton>
+        <section className="lobby-section"><div className="lobby-section__heading"><p className="section-label">MISSION CONTROL</p><span>SELECT ACTIVITY</span></div><div className="lobby-actions"><button className="lobby-action lobby-action--primary" onClick={() => setView('difficulty')}><GameIcon name="shield" size={27} /><span><strong>SOLO PLAY</strong><small>Endless waves · survive</small></span><GameIcon name="back" size={18} className="lobby-action__arrow" /></button><button className="lobby-action lobby-action--secondary" onClick={onStartTutorial}><GameIcon name="tutorial" size={27} /><span><strong>TUTORIAL</strong><small>Learn the field mechanics</small></span><GameIcon name="back" size={18} className="lobby-action__arrow" /></button><button className="lobby-action" onClick={() => setShowHowToPlay(true)}><GameIcon name="info" size={27} /><span><strong>FIELD GUIDE</strong><small>Controls and upgrades</small></span><GameIcon name="back" size={18} className="lobby-action__arrow" /></button></div></section>
+        <section className="lobby-stats"><StatRow label="Best wave" value={profile.bestWave} accent="primary" /><StatRow label="Total kills" value={formatNumber(profile.totalKills)} accent="secondary" /><StatRow label="Last mode" value={profile.difficulty} accent="gold" /></section>
+        {hasScores && <GlassSurface className="rankings-preview"><div className="lobby-section__heading"><p className="section-label">RANKINGS</p><span>LOCAL RECORDS</span></div>{difficulties.map((difficulty) => { const score = highScores[difficulty]?.[0]; return score && <div className="ranking-line" key={difficulty}><span>{difficulty}</span><strong>{score.score.toLocaleString()}</strong><small>WAVE {score.wave}</small></div>; })}</GlassSurface>}
       </div>
-
-      {/* UI States were removed */}
-      
-      {showHowToPlay && (
-        <div className="modal-overlay" onClick={() => setShowHowToPlay(false)}>
-          <div className="how-to-play-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>📖 How to Play</h2>
-              <button className="close-btn" onClick={() => setShowHowToPlay(false)}>✕</button>
-            </div>
-            <div className="modal-content">
-              <section>
-                <h3>🎯 Objective</h3>
-                <p>Survive as many waves as possible. Clear all vampires to complete each wave and unlock powerful upgrades every 3 waves!</p>
-              </section>
-              
-              <section>
-                <h3>🎮 Controls</h3>
-                <div className="controls-grid">
-                  <div className="control-item">
-                    <strong>Desktop:</strong>
-                    <p>WASD/Arrows to move<br/>Mouse to aim<br/>Click to shoot<br/>Space to dash</p>
-                  </div>
-                  <div className="control-item">
-                    <strong>Mobile:</strong>
-                    <p>Joystick to move<br/>Tap to shoot<br/>Dash button to dash</p>
-                  </div>
-                </div>
-              </section>
-              
-              <section>
-                <h3>⚡ Upgrades</h3>
-                <p>Every 3 waves, choose from 3 random upgrades:</p>
-                <ul>
-                  <li>❤️ <strong>Vitality</strong> - Increase max health</li>
-                  <li>💥 <strong>Firepower</strong> - Increase damage</li>
-                  <li>⚡ <strong>Rapid Fire</strong> - Shoot faster</li>
-                  <li>🏃 <strong>Agility</strong> - Move faster</li>
-                  <li>💨 <strong>Quick Dash</strong> - Dash more often</li>
-                  <li>🎯 <strong>Piercing Shots</strong> - Bullets pierce enemies</li>
-                </ul>
-              </section>
-              
-               <section>
-                <h3>🏆 Game Objectives</h3>
-                <ul>
-                  <li>Survive and beat the high score!</li>
-                  <li>Master the dash energy and aiming</li>
-                </ul>
-              </section>
-              
-              <section>
-                <h3>💡 Pro Tips</h3>
-                <ul>
-                  <li>Use dash strategically to escape when surrounded</li>
-                  <li>Keep moving to avoid getting cornered</li>
-                  <li>Balance offensive and defensive upgrades</li>
-                  <li>Watch your dash energy - it regenerates over time</li>
-                </ul>
-              </section>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
+      <nav className="lobby-bottom-nav" aria-label="Main navigation"><button className="is-active"><GameIcon name="play" size={21} /><span>PLAY</span></button><button><GameIcon name="shield" size={21} /><span>ARMORY</span></button><button><GameIcon name="trophy" size={21} /><span>RANKINGS</span></button><button><GameIcon name="users" size={21} /><span>SOCIAL</span></button></nav>
+      {showHowToPlay && <OverlaySheet title="Field Guide" kicker="VAMPIRE SIEGE" onClose={() => setShowHowToPlay(false)} className="field-guide"><div className="guide-block"><GameIcon name="shield" size={24} /><div><h3>Objective</h3><p>Survive each vampire wave, collect upgrades, and hold the field as long as possible.</p></div></div><div className="guide-block"><GameIcon name="zap" size={24} /><div><h3>Controls</h3><p>Move with the left control, aim and fire with the right control, and use Dash to escape pressure.</p></div></div><div className="guide-block"><GameIcon name="trophy" size={24} /><div><h3>Upgrades</h3><p>Every few waves, choose one upgrade to shape your run.</p></div></div><p className="icon-credit">Interface icons by Solar Icons · 480 Design · CC BY 4.0</p></OverlaySheet>}
+    </main>
   );
 }

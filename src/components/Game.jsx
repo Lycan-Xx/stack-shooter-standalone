@@ -1,6 +1,5 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useGameLoop } from '../engine/core/useGameLoop';
-import { soundManager } from '../engine/systems/sound.js';
 import HUD from './HUD';
 import StartScreen from './StartScreen';
 import GameOver from './GameOver';
@@ -12,11 +11,11 @@ import './Game.css';
 
 export default function Game() {
   const canvasRef = useRef(null);
+  const [exitHint, setExitHint] = useState(false);
 
   const {
     gameState,
     hudData,
-    difficultyBadge,
     upgradeOptions,
     tutorialText,
     wasdKeys,
@@ -30,19 +29,28 @@ export default function Game() {
     togglePause,
   } = useGameLoop(canvasRef);
 
+  useEffect(() => {
+    const showExitHint = () => {
+      setExitHint(true);
+      window.setTimeout(() => setExitHint(false), 2200);
+    };
+    window.addEventListener('app-exit-warning', showExitHint);
+    return () => window.removeEventListener('app-exit-warning', showExitHint);
+  }, []);
+
   return (
-    <div id="game-container">
+    <div id="game-container" className={`game-shell game-shell--${gameState}`} data-game-state={gameState}>
       <canvas ref={canvasRef} id="game-canvas"></canvas>
 
-      <div id="ui-overlay">
+      <div id="ui-overlay" className="game-shell__overlay">
+        {exitHint && <div className="system-message" role="status">Press back again to exit Stack Shooter</div>}
         {(gameState === 'playing' || gameState === 'tutorial') && (
           <>
             <HUD {...hudData} />
-            <div id="difficulty-badge">{difficultyBadge}</div>
           </>
         )}
 
-        <div id="wave-info"></div>
+        <div id="wave-info" aria-live="polite"></div>
 
         {gameState === 'start' && (
           <StartScreen
@@ -81,9 +89,9 @@ export default function Game() {
         )}
       </div>
 
-      <div id="crosshair"></div>
-
-      <Controls performDash={performDash} wasdKeys={wasdKeys} togglePause={togglePause} />
+      {(gameState === 'playing' || gameState === 'tutorial') && (
+        <Controls performDash={performDash} wasdKeys={wasdKeys} togglePause={togglePause} />
+      )}
     </div>
   );
 }

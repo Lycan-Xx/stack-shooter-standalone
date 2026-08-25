@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { gameStorage } from '../engine/systems/gameStorage.js';
 import GameButton from './ui/GameButton';
 import GamePanel from './ui/GamePanel';
+import GameIcon from './ui/GameIcon';
 import './GameOver.css';
 
 const formatDuration = (durationMs = 0) => {
@@ -24,7 +25,7 @@ export default function GameOver({ wave, kills, score, difficulty, durationMs, o
   const stats = [['Waves survived', wave], ['Kills', kills], ['Score', score.toLocaleString()], ['Time survived', formatDuration(durationMs)], ['Difficulty', difficulty.toUpperCase()]];
   return <div id="game-over" role="dialog" aria-modal="true" aria-labelledby="game-over-title">
     <GamePanel className="game-over-panel">
-      <p className="game-over-kicker">THE HUNT IS OVER</p>
+      <GameIcon name="skull" size={34} className="game-over-icon" /><p className="game-over-kicker">THE HUNT IS OVER</p>
       <h2 id="game-over-title">THE NIGHT HAS CLAIMED YOU</h2>
       <p className="game-over-subtitle">YOUR HUNT ENDS HERE</p>
       {(isNewBest || rank > 0) && <div className="new-best-banner">{rank > 0 ? `NEW RECORD · RANK #${rank}` : 'NEW PERSONAL BEST'}</div>}

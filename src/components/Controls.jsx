@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
+import GameIcon from './ui/GameIcon';
 import './Controls.css';
 
 export default function Controls({ performDash, wasdKeys, togglePause }) {
@@ -203,54 +204,6 @@ export default function Controls({ performDash, wasdKeys, togglePause }) {
     }
   };
 
-  // Add touch event handlers for action buttons to prevent interference with joysticks
-  useEffect(() => {
-    const dashBtn = document.getElementById('mobile-dash');
-    const pauseBtn = document.getElementById('mobile-pause');
-
-    const handleActionTouchStart = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-    };
-
-    const handleActionTouchMove = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-    };
-
-    const handleActionTouchEnd = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-    };
-
-    if (dashBtn) {
-      dashBtn.addEventListener('touchstart', handleActionTouchStart, { passive: false });
-      dashBtn.addEventListener('touchmove', handleActionTouchMove, { passive: false });
-      dashBtn.addEventListener('touchend', handleActionTouchEnd, { passive: false });
-    }
-
-    if (pauseBtn) {
-      pauseBtn.addEventListener('touchstart', handleActionTouchStart, { passive: false });
-      pauseBtn.addEventListener('touchmove', handleActionTouchMove, { passive: false });
-      pauseBtn.addEventListener('touchend', handleActionTouchEnd, { passive: false });
-    }
-
-    return () => {
-      if (dashBtn) {
-        dashBtn.removeEventListener('touchstart', handleActionTouchStart);
-        dashBtn.removeEventListener('touchmove', handleActionTouchMove);
-        dashBtn.removeEventListener('touchend', handleActionTouchEnd);
-      }
-      if (pauseBtn) {
-        pauseBtn.removeEventListener('touchstart', handleActionTouchStart);
-        pauseBtn.removeEventListener('touchmove', handleActionTouchMove);
-        pauseBtn.removeEventListener('touchend', handleActionTouchEnd);
-      }
-    };
-  }, []);
-
-
-
   return (
     <>
       {/* Desktop WASD Controls */}
@@ -309,16 +262,11 @@ export default function Controls({ performDash, wasdKeys, togglePause }) {
         </div>
         
         <div className="mobile-action-buttons">
-          <button id="mobile-pause" onClick={handlePauseClick} title="Pause" aria-label="Pause game">
-            <svg viewBox="0 0 24 24" fill="currentColor">
-              <rect x="6" y="4" width="4" height="16"/>
-              <rect x="14" y="4" width="4" height="16"/>
-            </svg>
+          <button id="mobile-pause" onPointerDown={handlePauseClick} title="Pause" aria-label="Pause game">
+            <GameIcon name="pause" size={25} strokeWidth={2.4} />
           </button>
-          <button id="mobile-dash" onClick={handleDashClick} title="Dash" aria-label="Dash">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M13 2L3 14h8l-1 8 10-12h-8l1-8z"/>
-            </svg>
+          <button id="mobile-dash" onPointerDown={handleDashClick} title="Dash" aria-label="Dash">
+            <GameIcon name="zap" size={33} strokeWidth={1.8} />
             <span className="action-label">DASH</span>
           </button>
         </div>

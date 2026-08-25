@@ -2,7 +2,7 @@
 
 export const UPGRADES = {
   maxHealth: {
-    name: '❤️ Vitality',
+    name: 'Vitality',
     description: 'Increase max health',
     maxLevel: 5,
     effect: (player, level) => {
@@ -11,7 +11,7 @@ export const UPGRADES = {
     },
   },
   damage: {
-    name: '💥 Firepower',
+    name: 'Firepower',
     description: 'Increase bullet damage',
     maxLevel: 5,
     effect: (player, level) => {
@@ -19,7 +19,7 @@ export const UPGRADES = {
     },
   },
   fireRate: {
-    name: '⚡ Rapid Fire',
+    name: 'Rapid Fire',
     description: 'Shoot faster',
     maxLevel: 5,
     effect: (player, level) => {
@@ -27,7 +27,7 @@ export const UPGRADES = {
     },
   },
   speed: {
-    name: '🏃 Agility',
+    name: 'Agility',
     description: 'Move faster',
     maxLevel: 5,
     effect: (player, level) => {
@@ -35,7 +35,7 @@ export const UPGRADES = {
     },
   },
   dashCooldown: {
-    name: '💨 Quick Dash',
+    name: 'Quick Dash',
     description: 'Reduce dash cooldown',
     maxLevel: 5,
     effect: (player, level) => {
@@ -43,7 +43,7 @@ export const UPGRADES = {
     },
   },
   piercing: {
-    name: '🎯 Piercing Shots',
+    name: 'Piercing Shots',
     description: 'Bullets pierce enemies',
     maxLevel: 3,
     effect: (player, level) => {

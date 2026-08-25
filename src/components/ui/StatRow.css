@@ -1,0 +1,19 @@
+.stat-row {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-left: 2px solid var(--border);
+  background: rgba(11, 14, 20, .38);
+}
+
+.stat-row__label { color: var(--text-muted); font: 500 .62rem/1.2 var(--font-tech); letter-spacing: .08em; text-transform: uppercase; }
+.stat-row__value { color: var(--text); font: 700 1rem/1.2 var(--font-display); }
+.stat-row__detail { color: var(--text-secondary); font: .68rem/1.2 var(--font-tech); }
+.stat-row--primary { border-left-color: var(--blue); }
+.stat-row--primary .stat-row__value { color: var(--blue-bright); }
+.stat-row--secondary { border-left-color: var(--green); }
+.stat-row--secondary .stat-row__value { color: var(--green-bright); }
+.stat-row--danger { border-left-color: var(--red); }
+.stat-row--danger .stat-row__value { color: var(--red); }
+.stat-row--gold { border-left-color: var(--gold); }
+.stat-row--gold .stat-row__value { color: var(--gold); }
